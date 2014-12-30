@@ -1,7 +1,7 @@
-import numpy as np
-import math
 import configparser
+import math
 import matplotlib.pyplot as plt
+import numpy as np
 
 from model.pacejka94 import Pacejka94 as pacejka
 
@@ -51,12 +51,12 @@ def tire_load(mass, accel, trackwidth, cg_height, weightdist, aloadtrnsfrdist):
 
 def main():
     # define vehicle parameters
-    cgheight = 300/1000    # in milimetres [mm]
-    wheelbase = 1650/1000  # in milimetres [mm]
-    trackwidth = 1250/1000  # in milimetres [mm]
+    cgheight = 300/1000    # in metres [m]
+    wheelbase = 1650/1000  # in metres [m]
+    trackwidth = 1250/1000  # in metres [m]
     weightdist = .40  # percentage, front [%]
     mass = 250  # kilograms [kg]
-    aloadtrnsfrdist = .35  # percentage, front [%]
+    aloadtrnsfrdist = .40  # percentage, front [%]
 
     # define test conditions
     error = 0.0001
@@ -67,14 +67,11 @@ def main():
 
     # read in tire data
     config = configparser.ConfigParser()
-    config.read('data/tire/avon_fs_front.ini')
+    config.read('data/tire/generic.ini')
     coeff = {key: float(config['lateral'][key]) for key in config['lateral']}
 
     # build tire model
     tire_model = pacejka(coeff)
-    sweep = np.linspace(-0.2, 0.2, 60)
-    result = [tire_model.fy(500, angle, 0) for angle in sweep]
-    print(result)
 
     # calculate vehicle characteristics
     a = wheelbase * (1 - weightdist)
@@ -120,16 +117,17 @@ def main():
                 fz_fr, fz_fl, fz_rr, fz_rl = tire_load(mass, a_lat/9.81, trackwidth, cgheight,
                                                        weightdist, aloadtrnsfrdist)
 
-            result_ay[i][j] = a_lat/9.81
+            result_ay[i][j] = a_lat / 9.81
             result_mz[i][j] = m_z
 
     plt.plot(result_ay[:][:], result_mz[:][:])
     plt.plot(np.transpose(result_ay)[:][:],
              np.transpose(result_mz)[:][:])
+    plt.xlabel('Lateral Acceleration [g]')
+    plt.ylabel('Yaw Moment [Nm]')
+    plt.title('Yaw Moment Diagram')
+    plt.grid(True)
     plt.show()
-
-    #np.savetxt('acceleration.csv', result_ay, delimiter=',')
-    #np.savetxt('yawmoment.csv', result_mz, delimiter=',')
     plt.savefig('ymd.png')
 
 

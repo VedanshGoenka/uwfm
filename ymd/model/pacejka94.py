@@ -34,8 +34,8 @@ class Pacejka94:
         '''
         Calculates tire force, F_y
         where f_z    vertical tire load [N]
-              alpha  slip angle [deg]
-              gamma  camber angle [deg]
+              alpha  slip angle [rad]
+              gamma  camber angle [rad]
         '''
         h = self.cHy(f_z, gamma)
         k = self.cKy(f_z, gamma)
@@ -55,7 +55,7 @@ class Pacejka94:
         '''
         Calculates lateral peak factor, D
         where f_z    vertical tire load [N]
-              gamma  camber angle [deg]
+              gamma  camber angle [rad]
         '''
         return f_z * (self.pDy1 + self.pDy2 * self.fnorm(f_z)) * (1 - self.pDy3 * gamma * gamma)
 
@@ -63,7 +63,7 @@ class Pacejka94:
         '''
         Calculates lateral stiffness, K
         where f_z    vertical tire load [N]
-              gamma  camber angle [deg]
+              gamma  camber angle [rad]
         '''
         return self.pKy1 * self.fnomin * math.sin(2 * math.atan(f_z / (self.pKy2
                                                     * self.fnomin))) * (1 - self.pKy3 * math.fabs(gamma))
@@ -81,8 +81,8 @@ class Pacejka94:
         '''
         Calculates lateral curvature factor, E
         where f_z    vertical tire load [N]
-              gamma  camber angle [deg]
-              alpha  slip angle [deg]
+              gamma  camber angle [rad]
+              alpha  slip angle [rad]
               yH     horizontal shift, H
         '''
         sign = math.copysign(1, alpha + yH)
@@ -92,7 +92,7 @@ class Pacejka94:
         '''
         Calculates lateral horizontal shift, H
         where f_z    vertical tire load [N]
-              gamma  camber angle [deg]
+              gamma  camber angle [rad]
         '''
         return self.pHy1 + self.pHy2 * self.fnorm(f_z) + self.pHy3 * gamma
 
@@ -100,7 +100,7 @@ class Pacejka94:
         '''
         Calculates lateral vertical shift, V
         where f_z    vertical tire load [N]
-              gamma  camber angle [deg]
+              gamma  camber angle [rad]
         '''
         return (self.pVy1 + self.pVy2 * self.fnorm(f_z) + ((self.pVy3 + self.pVy4 *
                                                             self.fnorm(f_z)) * gamma)) * f_z
@@ -108,7 +108,7 @@ class Pacejka94:
     def cBx1(self, alpha, cBy, cHy):
         '''
         Calculates ??? factor, Bx1
-        where alpha  slip angle [deg]
+        where alpha  slip angle [rad]
               cBy    stiffness factor, B
               cHy    horizontal shift, H
         '''
@@ -119,4 +119,4 @@ class Pacejka94:
         Calculates normalized vertical load, df_z
         where f_z    vertical tire load [N]
         '''
-        return (f_z - self.fnomin)/self.fnomin
+        return (f_z - self.fnomin) / self.fnomin
