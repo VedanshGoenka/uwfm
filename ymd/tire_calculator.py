@@ -15,16 +15,28 @@ def main():
     # build tire model
     tire_model = pacejka(coeff)
 
-    alpha_sweep = np.arange(-13, 14)
+    alpha_sweep = np.arange(-20, 21)
 
-    force_y = [tire_model.calc_fy(-22*9.81*4, math.radians(alpha), 0,
-        0.035) for alpha in alpha_sweep]
+    force_y = [tire_model.calc_fy(-22*9.81*3, math.radians(alpha), 0, 0) for alpha in alpha_sweep]
+    mom_z = [tire_model.calc_mz(-22*9.81*3, math.radians(alpha), 0, 0) for alpha in alpha_sweep]
 
     print(force_y)
+    print(mom_z)
 
+    plt.figure()
     plt.plot(alpha_sweep, force_y)
     plt.grid()
+    plt.xlabel('Slip Angle [deg]')
+    plt.ylabel('Lateral Force [N]')
     plt.savefig('latforce.png')
+
+    plt.figure()
+    plt.plot(alpha_sweep, mom_z)
+    plt.grid()
+    plt.xlabel('Slip Angle [deg]')
+    plt.ylabel('Yaw Moment [Nm]')
+    plt.show()
+    plt.savefig('yawmom.png')
 
 if __name__ == "__main__":
     main()
