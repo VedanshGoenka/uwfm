@@ -3,7 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
-from model.pacejka94 import Pacejka94 as pacejka
+from model.pacejka_MF52 import PacejkaMF52 as pacejka
 
 
 def solver(trackwidth, a, b, delta, fy_fr, fy_fl, fy_rr, fy_rl):
@@ -41,10 +41,10 @@ def tire_load(mass, accel, trackwidth, cg_height, weightdist, aloadtrnsfrdist):
     f_trnsfr = delta_load * aloadtrnsfrdist
     r_trnsfr = delta_load * (1 - aloadtrnsfrdist)
 
-    fz_fr = (9.81 * mass * weightdist / 2) - f_trnsfr
-    fz_fl = (9.81 * mass * weightdist / 2) + f_trnsfr
-    fz_rr = (9.81 * mass * (1 - weightdist) / 2) - r_trnsfr
-    fz_rl = (9.81 * mass * (1 - weightdist) / 2) + r_trnsfr
+    fz_fr = -(9.81 * mass * weightdist / 2) + f_trnsfr
+    fz_fl = -(9.81 * mass * weightdist / 2) - f_trnsfr
+    fz_rr = -(9.81 * mass * (1 - weightdist) / 2) + r_trnsfr
+    fz_rl = -(9.81 * mass * (1 - weightdist) / 2) - r_trnsfr
 
     return fz_fr, fz_fl, fz_rr, fz_rl
 
@@ -54,24 +54,34 @@ def main():
     cgheight = 300/1000    # in metres [m]
     wheelbase = 1650/1000  # in metres [m]
     trackwidth = 1250/1000  # in metres [m]
-    weightdist = .40  # percentage, front [%]
+    weightdist = .50  # percentage, front [%]
     mass = 250  # kilograms [kg]
-    aloadtrnsfrdist = .40  # percentage, front [%]
+    aloadtrnsfrdist = .50  # percentage, front [%]
 
     # define test conditions
     error = 0.0001
-    beta_sweep = np.arange(-8, 9)
+    beta_sweep = np.arange(-20, 20)
     beta_sweep = [math.radians(value) for value in beta_sweep]
-    delta_sweep = np.arange(-9, 10)
+    delta_sweep = np.arange(-15, 15)
     delta_sweep = [math.radians(value) for value in delta_sweep]
 
     # read in tire data
     config = configparser.ConfigParser()
-    config.read('data/tire/generic.ini')
-    coeff = {key: float(config['lateral'][key]) for key in config['lateral']}
+    config.read('data/tire/hoosier_lc0_sorted.ini')
+
+    # Extract coefficients
+    general = {key: float(config['general'][key]) for key in config['general']}
+    py = {key: float(config['lateral'][key]) for key in config['lateral']}
+    qz = {key: float(config['self_aligning'][key]) for key in config['self_aligning']}
+    px = {key: float(config['longitudinal'][key]) for key in config['longitudinal']}
+    qx = {key: float(config['overturning'][key]) for key in config['overturning']}
+    rx = {key: float(config['longitudinal_combined'][key]) for key in config['longitudinal_combined']}
+    ry = {key: float(config['lateral_combined'][key]) for key in config['lateral_combined']}
+    sz = {key: float(config['self_aligning_combined'][key]) for key in config['self_aligning_combined']}
+    qy = {key: float(config['roll_moment'][key]) for key in config['roll_moment']}
 
     # build tire model
-    tire_model = pacejka(coeff)
+    tire_model = pacejka(general, py, qz, px, qx, rx, ry, sz, qy)
 
     # calculate vehicle characteristics
     a = wheelbase * (1 - weightdist)
@@ -98,15 +108,16 @@ def main():
 
             while math.fabs(a_lat - a_lat_prev) > error:
                 # TODO: cannot guarantee that the solver runs
+                # TODO: check coordinate system!
 
                 # Initialize previous value
                 a_lat_prev = a_lat
 
                 # Calculate tire forces
-                fy_fr = -tire_model.fy(fz_fr, -(beta-delta), 0)
-                fy_fl = tire_model.fy(fz_fl, beta-delta, 0)
-                fy_rr = -tire_model.fy(fz_rr, -beta, 0)
-                fy_rl = tire_model.fy(fz_rl, beta, 0)
+                fy_fr = tire_model.calc_fy(fz_fr, beta+delta, 0, 0)
+                fy_fl = -tire_model.calc_fy(fz_fl, -(beta+delta), 0, 0)
+                fy_rr = tire_model.calc_fy(fz_rr, beta, 0, 0)
+                fy_rl = -tire_model.calc_fy(fz_rl, -beta, 0, 0)
 
                 # Solve for resulting forces and moments
                 solution = solver(trackwidth, a, b, delta, fy_fr, fy_fl, fy_rr, fy_rl)
@@ -117,8 +128,13 @@ def main():
                 fz_fr, fz_fl, fz_rr, fz_rl = tire_load(mass, a_lat/9.81, trackwidth, cgheight,
                                                        weightdist, aloadtrnsfrdist)
 
+            mz_fr = tire_model.calc_mz(fz_fr, beta+delta, 0, 0)
+            mz_fl = -tire_model.calc_mz(fz_fl, -(beta+delta), 0, 0)
+            mz_rr = tire_model.calc_mz(fz_rr, beta, 0, 0)
+            mz_rl = -tire_model.calc_mz(fz_rl, -beta, 0, 0)
+
             result_ay[i][j] = a_lat / 9.81
-            result_mz[i][j] = m_z
+            result_mz[i][j] = m_z + mz_fr + mz_fl + mz_rr + mz_rl
 
     plt.plot(result_ay[:][:], result_mz[:][:])
     plt.plot(np.transpose(result_ay)[:][:],
