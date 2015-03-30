@@ -51,16 +51,17 @@ def tire_load(mass, accel, trackwidth, cg_height, weightdist, aloadtrnsfrdist):
 
 def main():
     # define vehicle parameters
-    cgheight = 300/1000    # in metres [m]
+    cgheight = 0/1000    # in metres [m]
     wheelbase = 1650/1000  # in metres [m]
     trackwidth = 1250/1000  # in metres [m]
     weightdist = .50  # percentage, front [%]
     mass = 250  # kilograms [kg]
     aloadtrnsfrdist = .50  # percentage, front [%]
+    velocity = 30 # in metres per second [m/s]
 
     # define test conditions
     error = 0.0001
-    beta_sweep = np.arange(-20, 20)
+    beta_sweep = np.arange(-15, 15)
     beta_sweep = [math.radians(value) for value in beta_sweep]
     delta_sweep = np.arange(-15, 15)
     delta_sweep = [math.radians(value) for value in delta_sweep]
@@ -109,15 +110,30 @@ def main():
             while math.fabs(a_lat - a_lat_prev) > error:
                 # TODO: cannot guarantee that the solver runs
                 # TODO: check coordinate system!
+                # TODO: rethink variable naming
 
                 # Initialize previous value
                 a_lat_prev = a_lat
 
+                # Calculate yaw velocity
+                yaw_rate = a_lat/velocity
+
+                # Calculate slip angles 
+                velocity_y = velocity*math.tan(beta)
+                alpha_fr = math.atan((velocity_y + a*yaw_rate)/(velocity - trackwidth/2 * yaw_rate))
+                alpha_fl = math.atan((velocity_y + a*yaw_rate)/(velocity + trackwidth/2 * yaw_rate))
+                alpha_rr = math.atan((velocity_y - b*yaw_rate)/(velocity - trackwidth/2 * yaw_rate))
+                alpha_rl = math.atan((velocity_y - b*yaw_rate)/(velocity + trackwidth/2 * yaw_rate))
+
                 # Calculate tire forces
-                fy_fr = tire_model.calc_fy(fz_fr, beta+delta, 0, 0)
-                fy_fl = -tire_model.calc_fy(fz_fl, -(beta+delta), 0, 0)
-                fy_rr = tire_model.calc_fy(fz_rr, beta, 0, 0)
-                fy_rl = -tire_model.calc_fy(fz_rl, -beta, 0, 0)
+                fy_fr = tire_model.calc_fy(fz_fr, alpha_fr+delta, 0, 0)
+                fy_fl = -tire_model.calc_fy(fz_fl, -(alpha_fl+delta), 0, 0)
+                fy_rr = tire_model.calc_fy(fz_rr, alpha_rr, 0, 0)
+                fy_rl = -tire_model.calc_fy(fz_rl, -alpha_rl, 0, 0)
+
+                print(beta, alpha_fr, alpha_fl, alpha_rr, alpha_rl)
+                #print(a_lat, fy_fr, fy_fl, fy_rr, fy_rl)
+                #print(fz_fr, fz_rl, fz_rr, fz_rl)
 
                 # Solve for resulting forces and moments
                 solution = solver(trackwidth, a, b, delta, fy_fr, fy_fl, fy_rr, fy_rl)
