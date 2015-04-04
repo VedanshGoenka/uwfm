@@ -2,9 +2,15 @@ import math
 
 
 class PacejkaMF52:
-    ''' Pacejka MF5.2 tire model.
-        http://www.edy.es/dev/docs/pacejka-94-parameters-explained-a-comprehensive-guide/
-        http://www.optimumg.com/docs/OptimumTire_Help_File.pdf
+    '''
+    A class to represent the Magic Formula 5.2 tire model. Equations
+    are based on Pacejka 2002 with an extra term added into the
+    longitudinal calculations.
+
+    References
+    H. B. Pacejka, 'Tire and Vehicle Dynamics', 2006
+    http://www.racer.nl/reference/pacejka.htm
+    http://www.optimumg.com/docs/OptimumTire_Help_File.pdf
     '''
 
     def __init__(self, general, py, qz, px, qx, rx, ry, sz, qy):
@@ -183,7 +189,8 @@ class PacejkaMF52:
         if cEyk > 1:
             cEyk = 1
 
-        cGyk = math.cos(cCyk * math.atan(cByk * kappa - cEyk * (cByk * kappa - math.atan(cByk * kappa)))) / math.cos(cCyk * math.atan(cByk * cSHyk - cEyk * (cByk * cSHyk - math.atan(cByk * cSHyk))))
+        cGyk = math.cos(cCyk * math.atan(cByk * kappa - cEyk * (cByk * kappa - math.atan(cByk * kappa)))) \
+             / math.cos(cCyk * math.atan(cByk * cSHyk - cEyk * (cByk * cSHyk - math.atan(cByk * cSHyk))))
 
         return cGyk * fy0 + cSVyk
 

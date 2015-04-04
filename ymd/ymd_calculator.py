@@ -131,10 +131,6 @@ def main():
                 fy_rr = tire_model.calc_fy(fz_rr, alpha_rr, 0, 0)
                 fy_rl = -tire_model.calc_fy(fz_rl, -alpha_rl, 0, 0)
 
-                print(beta, alpha_fr, alpha_fl, alpha_rr, alpha_rl)
-                #print(a_lat, fy_fr, fy_fl, fy_rr, fy_rl)
-                #print(fz_fr, fz_rl, fz_rr, fz_rl)
-
                 # Solve for resulting forces and moments
                 solution = solver(trackwidth, a, b, delta, fy_fr, fy_fl, fy_rr, fy_rl)
 
