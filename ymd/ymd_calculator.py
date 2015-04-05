@@ -107,9 +107,9 @@ def main():
                 a_lat_prev = a_lat
 
                 # Set vehicle properties
-                car.calc_tireload()
                 car.a_lat = a_lat
                 car.yaw_rate = car.a_lat/car.velocity
+                car.calc_tireload()
 
                 # Update tire slip angles
                 car.update_tireslip()
