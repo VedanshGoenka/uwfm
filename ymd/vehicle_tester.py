@@ -36,7 +36,6 @@ def main():
     car.velocity = 50/3.6
 
     delta_sweep = np.arange(-20,20)  # in degrees
-    car.delta = 0.01
     forces = [car.resolve_forces(math.radians(delta)).flat[1] for delta in delta_sweep]
 
     import pdb; pdb.set_trace()

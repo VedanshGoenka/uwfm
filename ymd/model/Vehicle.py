@@ -25,13 +25,11 @@ class Vehicle:
         # Vehicle State
         # Velocities
         self.velocity = 0
-        self.velocity_x = 0
-        self.velocity_y = 0
         self.yaw_rate = 0
         self.a_lat = 0
         self.a_long = 0
 
-        # steering
+        # Steering
         self.delta = 0
 
         # Vertical Tire Load
@@ -52,14 +50,14 @@ class Vehicle:
             a_lat = self.a_lat
 
         # Highly simplified model - neglect kinematics and suspension
-        return (9.81 * self.mass * self.cg_height * a_lat) / self.trackwidth
+        return (self.mass * self.cg_height * a_lat) / self.trackwidth
 
     def calc_longloadtrnsfr(self, a_long=None):
         ''' UNUSED FOR NOW'''
         if a_long is None:
             a_long = self.a_long
 
-        return (9.81 * self.mass * self.cg_height * a_long) / self.wheelbase
+        return (self.mass * self.cg_height * a_long) / self.wheelbase
 
     def calc_tireload(self, a_lat=None, a_long=None):
         if a_lat is None:
@@ -84,15 +82,15 @@ class Vehicle:
         velocity_y = self.velocity*math.tan(self.beta)
 
         self.alpha_fr = math.atan((velocity_y +
-            self.a*yaw_rate)/(self.velocity - self.trackwidth/2 * self.yaw_rate))
+            self.a*self.yaw_rate)/(self.velocity - self.trackwidth/2 * self.yaw_rate))
         self.alpha_fl = math.atan((velocity_y +
-            self.a*yaw_rate)/(self.velocity + self.trackwidth/2 * self.yaw_rate))
+            self.a*self.yaw_rate)/(self.velocity + self.trackwidth/2 * self.yaw_rate))
         self.alpha_rr = math.atan((velocity_y -
-            self.b*yaw_rate)/(self.velocity - self.trackwidth/2 * self.yaw_rate))
+            self.b*self.yaw_rate)/(self.velocity - self.trackwidth/2 * self.yaw_rate))
         self.alpha_rl = math.atan((velocity_y -
-            self.b*yaw_rate)/(self.velocity + self.trackwidth/2 * self.yaw_rate))
+            self.b*self.yaw_rate)/(self.velocity + self.trackwidth/2 * self.yaw_rate))
 
-        return self.alpha_fr, self.alpha_rl, self_alpha_rr, self_alpha_rl
+        return self.alpha_fr, self.alpha_fl, self.alpha_rr, self.alpha_rl
 
     def calc_tire_latforce(self, delta=None):
         if delta is None:
@@ -147,6 +145,6 @@ class Vehicle:
 
         # TODO: Find a better name for this
         resolved = matrix * forces
-        resolved.flat[1] = resolved.flat[1] + mz_fr + mz_fl + mz_rr + mz_rl 
+        resolved.flat[2] = resolved.flat[2] + mz_fr + mz_fl + mz_rr + mz_rl 
         
         return resolved

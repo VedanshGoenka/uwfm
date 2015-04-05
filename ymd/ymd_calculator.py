@@ -3,8 +3,8 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
-from model.pacejka_MF52 import PacejkaMF52 as pacejka
-
+from model.pacejka_MF52 import PacejkaMF52 as Pacejka
+from model.Vehicle import Vehicle
 
 def solver(trackwidth, a, b, delta, fy_fr, fy_fl, fy_rr, fy_rl):
     # Transformation matrix
@@ -50,27 +50,18 @@ def tire_load(mass, accel, trackwidth, cg_height, weightdist, aloadtrnsfrdist):
 
 
 def main():
-    # define vehicle parameters
-    cgheight = 0/1000    # in metres [m]
-    wheelbase = 1650/1000  # in metres [m]
-    trackwidth = 1250/1000  # in metres [m]
-    weightdist = .50  # percentage, front [%]
-    mass = 250  # kilograms [kg]
-    aloadtrnsfrdist = .50  # percentage, front [%]
-    velocity = 30 # in metres per second [m/s]
-
     # define test conditions
+    velocity = 20  # [m/s]
     error = 0.0001
     beta_sweep = np.arange(-15, 15)
     beta_sweep = [math.radians(value) for value in beta_sweep]
     delta_sweep = np.arange(-15, 15)
     delta_sweep = [math.radians(value) for value in delta_sweep]
 
-    # read in tire data
+    # Load tire data and build model
     config = configparser.ConfigParser()
     config.read('data/tire/hoosier_lc0_sorted.ini')
 
-    # Extract coefficients
     general = {key: float(config['general'][key]) for key in config['general']}
     py = {key: float(config['lateral'][key]) for key in config['lateral']}
     qz = {key: float(config['self_aligning'][key]) for key in config['self_aligning']}
@@ -82,71 +73,55 @@ def main():
     qy = {key: float(config['roll_moment'][key]) for key in config['roll_moment']}
 
     # build tire model
-    tire_model = pacejka(general, py, qz, px, qx, rx, ry, sz, qy)
+    tire_model = Pacejka(general, py, qz, px, qx, rx, ry, sz, qy)
 
-    # calculate vehicle characteristics
-    a = wheelbase * (1 - weightdist)
-    b = wheelbase - a
+    # Load vehicle data and build model
+    config.read('data/vehicle/generic_fsae.ini')
+    dimensions = {key: float(config['dimensions'][key]) for key in config['dimensions']}
 
-    # static vertical load
-    staticfz_fr, staticfz_fl, staticfz_rr, staticfz_rl = tire_load(mass, 0, trackwidth, cgheight,
-                                                                   weightdist, aloadtrnsfrdist)
+    car = Vehicle(tire_model, tire_model, tire_model, tire_model, dimensions)
+    car.velocity = velocity
 
+    # Initialize results arraw
     result_ay = np.empty([len(beta_sweep), len(delta_sweep)])
     result_mz = np.empty([len(beta_sweep), len(delta_sweep)])
 
     for i, beta in enumerate(beta_sweep):
-        for j, delta in enumerate(delta_sweep):
-            # Initialize vertical load variables
-            fz_fr = staticfz_fr
-            fz_fl = staticfz_fl
-            fz_rr = staticfz_rr
-            fz_rl = staticfz_rl
+        # Set vehicle slip angle
+        car.beta = beta
 
+        for j, delta in enumerate(delta_sweep):
+            # Set static tire load
+            car.a_lat = 0
+            car.a_long = 0
+
+            car.delta = delta
+
+            # Initialize variables
             m_z = 0
             a_lat = 0
             a_lat_prev = 100
 
             while math.fabs(a_lat - a_lat_prev) > error:
-                # TODO: cannot guarantee that the solver runs
-                # TODO: check coordinate system!
-                # TODO: rethink variable naming
-
                 # Initialize previous value
                 a_lat_prev = a_lat
 
-                # Calculate yaw velocity
-                yaw_rate = a_lat/velocity
+                # Set vehicle properties
+                car.calc_tireload()
+                car.a_lat = a_lat
+                car.yaw_rate = car.a_lat/car.velocity
 
-                # Calculate slip angles 
-                velocity_y = velocity*math.tan(beta)
-                alpha_fr = math.atan((velocity_y + a*yaw_rate)/(velocity - trackwidth/2 * yaw_rate))
-                alpha_fl = math.atan((velocity_y + a*yaw_rate)/(velocity + trackwidth/2 * yaw_rate))
-                alpha_rr = math.atan((velocity_y - b*yaw_rate)/(velocity - trackwidth/2 * yaw_rate))
-                alpha_rl = math.atan((velocity_y - b*yaw_rate)/(velocity + trackwidth/2 * yaw_rate))
+                # Update tire slip angles
+                car.update_tireslip()
 
-                # Calculate tire forces
-                fy_fr = tire_model.calc_fy(fz_fr, alpha_fr+delta, 0, 0)
-                fy_fl = -tire_model.calc_fy(fz_fl, -(alpha_fl+delta), 0, 0)
-                fy_rr = tire_model.calc_fy(fz_rr, alpha_rr, 0, 0)
-                fy_rl = -tire_model.calc_fy(fz_rl, -alpha_rl, 0, 0)
+                # Solve the vehicle
+                solution = car.resolve_forces()
 
-                # Solve for resulting forces and moments
-                solution = solver(trackwidth, a, b, delta, fy_fr, fy_fl, fy_rr, fy_rl)
-
-                a_lat = solution.flat[1]/mass
+                a_lat = solution.flat[1]/car.mass
                 m_z = solution.flat[2]
 
-                fz_fr, fz_fl, fz_rr, fz_rl = tire_load(mass, a_lat/9.81, trackwidth, cgheight,
-                                                       weightdist, aloadtrnsfrdist)
-
-            mz_fr = tire_model.calc_mz(fz_fr, beta+delta, 0, 0)
-            mz_fl = -tire_model.calc_mz(fz_fl, -(beta+delta), 0, 0)
-            mz_rr = tire_model.calc_mz(fz_rr, beta, 0, 0)
-            mz_rl = -tire_model.calc_mz(fz_rl, -beta, 0, 0)
-
             result_ay[i][j] = a_lat / 9.81
-            result_mz[i][j] = m_z + mz_fr + mz_fl + mz_rr + mz_rl
+            result_mz[i][j] = m_z
 
     plt.plot(result_ay[:][:], result_mz[:][:])
     plt.plot(np.transpose(result_ay)[:][:],
