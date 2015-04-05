@@ -51,7 +51,7 @@ def tire_load(mass, accel, trackwidth, cg_height, weightdist, aloadtrnsfrdist):
 
 def main():
     # define test conditions
-    velocity = 20  # [m/s]
+    velocity = 19/3.6  # [m/s]
     error = 0.0001
     beta_sweep = np.arange(-15, 15)
     beta_sweep = [math.radians(value) for value in beta_sweep]
@@ -101,18 +101,19 @@ def main():
             m_z = 0
             a_lat = 0
             a_lat_prev = 100
+            relaxation = 0.5 
 
             while math.fabs(a_lat - a_lat_prev) > error:
-                # Initialize previous value
-                a_lat_prev = a_lat
-
                 # Set vehicle properties
-                car.a_lat = a_lat
+                car.a_lat = a_lat * relaxation + a_lat_prev * (1 - relaxation)
                 car.yaw_rate = car.a_lat/car.velocity
                 car.calc_tireload()
 
+                # Initialize previous value
+                a_lat_prev = a_lat
+
                 # Update tire slip angles
-                car.update_tireslip()
+                print(car.update_tireslip())
 
                 # Solve the vehicle
                 solution = car.resolve_forces()
