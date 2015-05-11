@@ -51,11 +51,11 @@ def tire_load(mass, accel, trackwidth, cg_height, weightdist, aloadtrnsfrdist):
 
 def main():
     # define test conditions
-    velocity = 19/3.6  # [m/s]
+    velocity = 70/3.6  # [m/s]
     error = 0.0001
-    beta_sweep = np.arange(-15, 15)
+    beta_sweep = np.arange(-12, 12)
     beta_sweep = [math.radians(value) for value in beta_sweep]
-    delta_sweep = np.arange(-15, 15)
+    delta_sweep = np.arange(-12, 12)
     delta_sweep = [math.radians(value) for value in delta_sweep]
 
     # Load tire data and build model
@@ -113,7 +113,7 @@ def main():
                 a_lat_prev = a_lat
 
                 # Update tire slip angles
-                print(car.update_tireslip())
+                car.update_tireslip()
 
                 # Solve the vehicle
                 solution = car.resolve_forces()
@@ -121,12 +121,16 @@ def main():
                 a_lat = solution.flat[1]/car.mass
                 m_z = solution.flat[2]
 
+            if (car.fz_fr > 0 or car.fz_fl > 0 or car.fz_rr > 0 or 
+                    car.fz_rl > 0):
+                print("Tire Lift!")
+
             result_ay[i][j] = a_lat / 9.81
             result_mz[i][j] = m_z
 
-    plt.plot(result_ay[:][:], result_mz[:][:])
+    plt.plot(result_ay[:][:], result_mz[:][:], color='red')
     plt.plot(np.transpose(result_ay)[:][:],
-             np.transpose(result_mz)[:][:])
+             np.transpose(result_mz)[:][:], color='blue')
     plt.xlabel('Lateral Acceleration [g]')
     plt.ylabel('Yaw Moment [Nm]')
     plt.title('Yaw Moment Diagram')

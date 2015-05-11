@@ -32,6 +32,8 @@ class PacejkaMF52:
              sz: combined aligning torque
              qy: roll moment
         '''
+        # Hard code this for now
+        self.uy = 0.7
 
         self.fnomin = general['fnomin']
         self.re = general['re']
@@ -141,7 +143,7 @@ class PacejkaMF52:
         '''
         # Shift factors
         cSHy = self.pHy1 + self.pHy2 * self.fnorm(f_z) + self.pHy3 * gamma
-        cSVy = (self.pVy1 + self.pVy2 * self.fnorm(f_z) + ((self.pVy3 + self.pVy4 * self.fnorm(f_z)) * gamma)) * f_z
+        cSVy = (self.pVy1 + self.pVy2 * self.fnorm(f_z) + ((self.pVy3 + self.pVy4 * self.fnorm(f_z)) * gamma)) * f_z * self.uy
 
         # Effective slip angle
         cSAy = alpha + cSHy
@@ -149,7 +151,7 @@ class PacejkaMF52:
         # Shape factors
         cKy = self.pKy1 * self.fnomin * math.sin(2 * math.atan(f_z / (self.pKy2 * self.fnomin))) * (1 - self.pKy3 * gamma ** 2 * math.fabs(gamma))
         cCy = self.pCy1
-        cDy = f_z * (self.pDy1 + self.pDy2 * self.fnorm(f_z)) * (1 - self.pDy3 * gamma * gamma)
+        cDy = f_z * self.uy * (self.pDy1 + self.pDy2 * self.fnorm(f_z)) * (1 - self.pDy2 * gamma * gamma)
         cEy = (self.pEy1 + self.pEy2 * self.fnorm(f_z)) * (1 - (self.pEy4 * gamma + self.pEy3) * math.copysign(1, cSAy))
         if cEy > 1:
             cEy = 1
@@ -203,7 +205,7 @@ class PacejkaMF52:
 
         cDt = fz * (self.qDz1 + self.qDz2 * self.fnorm(fz)) * (1 + self.qDz3 * gamma + self.qDz4 * gamma * gamma) * (self.r0 / self.fnomin)
         cCt = self.qCz1
-        cBt = (self.qBz1 + self.qBz2 * self.fnorm(fz) + self.qBz3 * self.fnorm(fz) ** 2) * (1 + self.qBz4 * gamma + self.qBz5 * math.fabs(gamma))
+        cBt = (self.qBz1 + self.qBz2 * self.fnorm(fz) + self.qBz3 * self.fnorm(fz) ** 2) * (1 + self.qBz4 * gamma + self.qBz5 * math.fabs(gamma)) / self.uy
         if cBt < 0:
             cBt = 0
 
@@ -220,8 +222,8 @@ class PacejkaMF52:
         cSHf = param_y['cSHy'] + param_y['cSVy'] / param_y['cKy']
         cSAr = alpha + cSHf
 
-        cBr = self.qBz9 + self.qBz10 * param_y['cBy'] * param_y['cCy']
-        cDr = fz * ((self.qDz6 + self.qDz7 * self.fnorm(fz)) + (self.qDz8 + self.qDz9 * self.fnorm(fz)) * gamma) * self.r0 * math.cos(alpha)
+        cBr = self.qBz9/self.uy + self.qBz10 * param_y['cBy'] * param_y['cCy']
+        cDr = fz * ((self.qDz6 + self.qDz7 * self.fnorm(fz)) + (self.qDz8 + self.qDz9 * self.fnorm(fz)) * gamma) * self.r0 * math.cos(alpha) * self.uy
 
         cMzr = cDr * math.cos(math.atan(cBr * cSAr))
 

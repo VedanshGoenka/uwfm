@@ -76,6 +76,10 @@ class Vehicle:
         self.fz_rr = -(9.81 * self.mass * (1 - self.weightdist_front) / 2) + rear_lat_trnsfr
         self.fz_rl = -(9.81 * self.mass * (1 - self.weightdist_front) / 2) - rear_lat_trnsfr
 
+        if (self.fz_fr > 0 or self.fz_fl > 0 or self.fz_rr > 0 or 
+                self.fz_rl > 0):
+            print("Tire Lift!")
+
         return self.fz_fr, self.fz_fl, self.fz_rr, self.fz_rl
 
     def update_tireslip(self):
