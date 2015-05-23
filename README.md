@@ -6,6 +6,8 @@ for any tools I've developed for the team.
 
 Projects
 ========
+fsaem_history - FSAE Michigan History. Plotter scripts to visualize
+competition data.
 ymd - Yaw Moment Diagram. Implements Pacejka MF5.2 to generate a YMD.
 
 Why Open Source?
