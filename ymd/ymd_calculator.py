@@ -3,50 +3,8 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
-from model.pacejka_MF52 import PacejkaMF52 as Pacejka
+from model.Pacejka_MF52 import PacejkaMF52 as Pacejka
 from model.Vehicle import Vehicle
-
-def solver(trackwidth, a, b, delta, fy_fr, fy_fl, fy_rr, fy_rl):
-    # Transformation matrix
-    a11 = math.sin(delta)
-    a12 = math.sin(delta)
-    a13 = 0
-    a14 = 0
-    a21 = math.cos(delta)
-    a22 = math.cos(delta)
-    a23 = 1
-    a24 = 1
-    a31 = (trackwidth/2*math.sin(delta) + a*math.cos(delta))
-    a32 = (-trackwidth/2*math.sin(delta) + a*math.cos(delta))
-    a33 = -b
-    a34 = -b
-
-    matrix = np.matrix([[a11, a12, a13, a14],   # F_x
-                        [a21, a22, a23, a24],   # F_y
-                        [a31, a32, a33, a34]])  # M_z
-
-    # FR, FL, RR, RL
-    forces = np.matrix([[fy_fr], [fy_fl], [fy_rr], [fy_rl]])
-
-    return matrix * forces
-
-
-def load_transfer(mass, accel, trackwidth, cg_height):
-    # Highly simplified model - neglect kinematics and suspension
-    return (9.81 * mass * cg_height * accel) / trackwidth
-
-
-def tire_load(mass, accel, trackwidth, cg_height, weightdist, aloadtrnsfrdist):
-    delta_load = load_transfer(mass, accel, trackwidth, cg_height)
-    f_trnsfr = delta_load * aloadtrnsfrdist
-    r_trnsfr = delta_load * (1 - aloadtrnsfrdist)
-
-    fz_fr = -(9.81 * mass * weightdist / 2) + f_trnsfr
-    fz_fl = -(9.81 * mass * weightdist / 2) - f_trnsfr
-    fz_rr = -(9.81 * mass * (1 - weightdist) / 2) + r_trnsfr
-    fz_rl = -(9.81 * mass * (1 - weightdist) / 2) - r_trnsfr
-
-    return fz_fr, fz_fl, fz_rr, fz_rl
 
 
 def main():
@@ -105,32 +63,24 @@ def main():
 
             while math.fabs(a_lat - a_lat_prev) > error:
                 # Set vehicle properties
-                car.a_lat = a_lat * relaxation + a_lat_prev * (1 - relaxation)
-                car.yaw_rate = car.a_lat/car.velocity
-                car.calc_tireload()
+                a_lat = a_lat * relaxation + a_lat_prev * (1 - relaxation)
+                yaw_rate = a_lat/velocity
 
                 # Initialize previous value
                 a_lat_prev = a_lat
 
-                # Update tire slip angles
-                car.update_tireslip()
-
                 # Solve the vehicle
-                solution = car.resolve_forces()
+                solution = car.calc_vehicle_forces(velocity, yaw_rate, a_lat, beta, delta)
 
                 a_lat = solution.flat[1]/car.mass
                 m_z = solution.flat[2]
 
-            if (car.fz_fr > 0 or car.fz_fl > 0 or car.fz_rr > 0 or 
-                    car.fz_rl > 0):
-                print("Tire Lift!")
-
             result_ay[i][j] = a_lat / 9.81
             result_mz[i][j] = m_z
 
-    plt.plot(result_ay[:][:], result_mz[:][:], color='red')
     plt.plot(np.transpose(result_ay)[:][:],
-             np.transpose(result_mz)[:][:], color='blue')
+             np.transpose(result_mz)[:][:], color='black')
+    plt.plot(result_ay[:][:], result_mz[:][:], color='red')
     plt.xlabel('Lateral Acceleration [g]')
     plt.ylabel('Yaw Moment [Nm]')
     plt.title('Yaw Moment Diagram')

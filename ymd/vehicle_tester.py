@@ -2,7 +2,7 @@ import math
 import configparser
 import numpy as np
 
-from model.pacejka_MF52 import PacejkaMF52 as Pacejka
+from model.Pacejka_MF52 import PacejkaMF52 as Pacejka
 from model.Vehicle import Vehicle
 
 def main():

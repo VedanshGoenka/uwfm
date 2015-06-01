@@ -3,7 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
-from model.pacejka_MF52 import PacejkaMF52 as pacejka
+from model.Pacejka_MF52 import PacejkaMF52 as pacejka
 
 
 def main():

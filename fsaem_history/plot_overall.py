@@ -21,6 +21,7 @@ for idx, year in enumerate(competition_years):
     competition_statistics[idx, 3] = competition_results_data[competition_results_data.Year == year].Points.convert_objects(convert_numeric=True).max()
     competition_statistics[idx, 4] = competition_results_data[competition_results_data.Year == year].Points.convert_objects(convert_numeric=True).min()
 
+print(competition_statistics)
 # Create the figure
 plt.figure(figsize=(12, 9))
 plt.title('Historical Total Scores at Formula SAE Michigan')
