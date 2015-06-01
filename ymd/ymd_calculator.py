@@ -7,18 +7,11 @@ from model.Pacejka_MF52 import PacejkaMF52 as Pacejka
 from model.Vehicle import Vehicle
 
 
-def main():
-    # define test conditions
-    velocity = 70/3.6  # [m/s]
-    error = 0.0001
-    beta_sweep = np.arange(-12, 12)
-    beta_sweep = [math.radians(value) for value in beta_sweep]
-    delta_sweep = np.arange(-12, 12)
-    delta_sweep = [math.radians(value) for value in delta_sweep]
+def build_tire_model(filename):
+    '''Builds a tire model instance using parameters in filename'''
 
-    # Load tire data and build model
     config = configparser.ConfigParser()
-    config.read('data/tire/hoosier_lc0_sorted.ini')
+    config.read(filename)
 
     general = {key: float(config['general'][key]) for key in config['general']}
     py = {key: float(config['lateral'][key]) for key in config['lateral']}
@@ -30,15 +23,33 @@ def main():
     sz = {key: float(config['self_aligning_combined'][key]) for key in config['self_aligning_combined']}
     qy = {key: float(config['roll_moment'][key]) for key in config['roll_moment']}
 
-    # build tire model
-    tire_model = Pacejka(general, py, qz, px, qx, rx, ry, sz, qy)
+    return Pacejka(general, py, qz, px, qx, rx, ry, sz, qy)
 
-    # Load vehicle data and build model
-    config.read('data/vehicle/generic_fsae.ini')
+
+def build_vehicle_model(vehicle_config, tire_config):
+    '''Builds a vehicle model instance using parameters in vehicle_config and tire_config'''
+
+    config = configparser.ConfigParser()
+    config.read(vehicle_config)
+
     dimensions = {key: float(config['dimensions'][key]) for key in config['dimensions']}
 
-    car = Vehicle(tire_model, tire_model, tire_model, tire_model, dimensions)
-    car.velocity = velocity
+    # TODO: allow flexible way to specify tires on all tires
+    tire_model = build_tire_model(tire_config)
+
+    return Vehicle(tire_model, tire_model, tire_model, tire_model, dimensions)
+
+
+def main():
+    # define test conditions
+    velocity = 70/3.6  # [m/s]
+    error = 0.0001
+    beta_sweep = np.arange(-12, 13)
+    beta_sweep = [math.radians(value) for value in beta_sweep]
+    delta_sweep = np.arange(-12, 13)
+    delta_sweep = [math.radians(value) for value in delta_sweep]
+
+    car = build_vehicle_model('data/vehicle/generic_fsae.ini', 'data/tire/hoosier_lc0_sorted.ini')
 
     # Initialize results arraw
     result_ay = np.empty([len(beta_sweep), len(delta_sweep)])
@@ -59,18 +70,17 @@ def main():
             m_z = 0
             a_lat = 0
             a_lat_prev = 100
-            relaxation = 0.5 
+            relaxation = 0.5  # TODO: Move me somewhere else!
 
             while math.fabs(a_lat - a_lat_prev) > error:
-                # Set vehicle properties
+                # Relaxation to allow convergence at low speeds
                 a_lat = a_lat * relaxation + a_lat_prev * (1 - relaxation)
-                yaw_rate = a_lat/velocity
-
-                # Initialize previous value
                 a_lat_prev = a_lat
 
-                # Solve the vehicle
-                solution = car.calc_vehicle_forces(velocity, yaw_rate, a_lat, beta, delta)
+                # Calculate vehicle yaw speed
+                yaw_speed = a_lat/velocity
+
+                solution = car.calc_vehicle_forces(velocity, yaw_speed, a_lat, beta, delta)
 
                 a_lat = solution.flat[1]/car.mass
                 m_z = solution.flat[2]
@@ -78,6 +88,7 @@ def main():
             result_ay[i][j] = a_lat / 9.81
             result_mz[i][j] = m_z
 
+    # Plot
     plt.plot(np.transpose(result_ay)[:][:],
              np.transpose(result_mz)[:][:], color='black')
     plt.plot(result_ay[:][:], result_mz[:][:], color='red')

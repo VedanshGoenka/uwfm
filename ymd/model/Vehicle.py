@@ -91,15 +91,15 @@ class Vehicle:
 
         return fz_fr, fz_fl, fz_rr, fz_rl
 
-    def calc_slip_angles(self, velocity, yaw_rate, beta):
+    def calc_slip_angles(self, velocity, yaw_speed, beta):
         '''Calculate the tire slip angles'''
 
         velocity_y = velocity*math.tan(beta)
 
-        alpha_fr = math.atan((velocity_y + self.a*yaw_rate)/(velocity - self.trackwidth/2 * yaw_rate))
-        alpha_fl = math.atan((velocity_y + self.a*yaw_rate)/(velocity + self.trackwidth/2 * yaw_rate))
-        alpha_rr = math.atan((velocity_y - self.b*yaw_rate)/(velocity - self.trackwidth/2 * yaw_rate))
-        alpha_rl = math.atan((velocity_y - self.b*yaw_rate)/(velocity + self.trackwidth/2 * yaw_rate))
+        alpha_fr = math.atan((velocity_y + self.a*yaw_speed)/(velocity - self.trackwidth/2 * yaw_speed))
+        alpha_fl = math.atan((velocity_y + self.a*yaw_speed)/(velocity + self.trackwidth/2 * yaw_speed))
+        alpha_rr = math.atan((velocity_y - self.b*yaw_speed)/(velocity - self.trackwidth/2 * yaw_speed))
+        alpha_rl = math.atan((velocity_y - self.b*yaw_speed)/(velocity + self.trackwidth/2 * yaw_speed))
 
         return alpha_fr, alpha_fl, alpha_rr, alpha_rl
 
@@ -124,10 +124,10 @@ class Vehicle:
 
         return mz_fr, mz_fl, mz_rr, mz_rl
 
-    def calc_vehicle_forces(self, velocity, yaw_rate, a_lat, beta, delta):
+    def calc_vehicle_forces(self, velocity, yaw_speed, a_lat, beta, delta):
         '''Calculate the resolved forces and moments acting on the car'''
 
-        alpha_fr, alpha_fl, alpha_rr, alpha_rl = self.calc_slip_angles(velocity, yaw_rate, beta)
+        alpha_fr, alpha_fl, alpha_rr, alpha_rl = self.calc_slip_angles(velocity, yaw_speed, beta)
         fz_fr, fz_fl, fz_rr, fz_rl = self.calc_vertical_load(a_lat, 0)  # assume a_long is zero
         fy_fr, fy_fl, fy_rr, fy_rl = self.calc_lateral_forces(fz_fr, fz_fl, fz_rr, fz_rl, alpha_fr, alpha_fl, alpha_rr, alpha_rl, delta)
         mz_fr, mz_fl, mz_rr, mz_rl = self.calc_self_aligning(fz_fr, fz_rl, fz_rr, fz_rl, alpha_fr, alpha_fl, alpha_rr, alpha_rl, delta)
