@@ -5,12 +5,13 @@ import numpy as np
 
 from model.Pacejka_MF52 import PacejkaMF52 as Pacejka
 from model.Vehicle import Vehicle
+from model.YMDSimulation import YMDSimulation
 
 
 def build_tire_model(filename):
     '''Builds a tire model instance using parameters in filename'''
 
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(inline_comment_prefixes=';')
     config.read(filename)
 
     general = {key: float(config['general'][key]) for key in config['general']}
@@ -29,7 +30,7 @@ def build_tire_model(filename):
 def build_vehicle_model(vehicle_config, tire_config):
     '''Builds a vehicle model instance using parameters in vehicle_config and tire_config'''
 
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(inline_comment_prefixes=';')
     config.read(vehicle_config)
 
     dimensions = {key: float(config['dimensions'][key]) for key in config['dimensions']}
@@ -40,26 +41,51 @@ def build_vehicle_model(vehicle_config, tire_config):
     return Vehicle(tire_model, tire_model, tire_model, tire_model, dimensions)
 
 
+def build_simulation_params(simulation_config):
+    '''Builds a YMDSimulation instance to store YMD simulation paramaters'''
+
+    config = configparser.ConfigParser(inline_comment_prefixes=';')
+    config.read(simulation_config)
+
+    simulation_params = {key: float(config['simulation'][key]) for key in config['simulation']}
+
+    return YMDSimulation(simulation_params)
+
+
+def converge_lateral_acceleration(vehicle_model, simulation, beta, delta, relaxation):
+        # Initialize variables
+        m_z = 0
+        a_lat = 0
+        a_lat_prev = 100
+
+        # Iterate until we are within the allowed tolerance
+        while math.fabs(a_lat - a_lat_prev) > simulation.tolerance:
+            # Relaxation to allow convergence at low speeds
+            a_lat = a_lat * relaxation + a_lat_prev * (1 - relaxation)
+            a_lat_prev = a_lat
+
+            # Calculate vehicle yaw speed
+            yaw_speed = a_lat/simulation.velocity
+
+            solution = car.calc_vehicle_forces(simulation.velocity, yaw_speed, a_lat, beta, delta)
+
+            a_lat = solution.flat[1]/car.mass
+            m_z = solution.flat[2]
+
+        return solution
+
+
 def main():
     # define test conditions
-    velocity = 70/3.6  # [m/s]
-    error = 0.0001
-    beta_sweep = np.arange(-12, 13)
-    beta_sweep = [math.radians(value) for value in beta_sweep]
-    delta_sweep = np.arange(-12, 13)
-    delta_sweep = [math.radians(value) for value in delta_sweep]
-
+    simulation = build_simulation_params('data/simulation/generic_ymd.ini')
     car = build_vehicle_model('data/vehicle/generic_fsae.ini', 'data/tire/hoosier_lc0_sorted.ini')
 
     # Initialize results arraw
-    result_ay = np.empty([len(beta_sweep), len(delta_sweep)])
-    result_mz = np.empty([len(beta_sweep), len(delta_sweep)])
+    result_ay = np.empty([len(simulation.beta_range), len(simulation.delta_range)])
+    result_mz = np.empty([len(simulation.beta_range), len(simulation.delta_range)])
 
-    for i, beta in enumerate(beta_sweep):
-        # Set vehicle slip angle
-        car.beta = beta
-
-        for j, delta in enumerate(delta_sweep):
+    for i, beta in enumerate(simulation.beta_range):
+        for j, delta in enumerate(simulation.delta_range):
             # Set static tire load
             car.a_lat = 0
             car.a_long = 0
@@ -72,15 +98,15 @@ def main():
             a_lat_prev = 100
             relaxation = 0.5  # TODO: Move me somewhere else!
 
-            while math.fabs(a_lat - a_lat_prev) > error:
+            while math.fabs(a_lat - a_lat_prev) > simulation.tolerance:
                 # Relaxation to allow convergence at low speeds
                 a_lat = a_lat * relaxation + a_lat_prev * (1 - relaxation)
                 a_lat_prev = a_lat
 
                 # Calculate vehicle yaw speed
-                yaw_speed = a_lat/velocity
+                yaw_speed = a_lat/simulation.velocity
 
-                solution = car.calc_vehicle_forces(velocity, yaw_speed, a_lat, beta, delta)
+                solution = car.calc_vehicle_forces(simulation.velocity, yaw_speed, a_lat, beta, delta)
 
                 a_lat = solution.flat[1]/car.mass
                 m_z = solution.flat[2]
@@ -94,7 +120,7 @@ def main():
     plt.plot(result_ay[:][:], result_mz[:][:], color='red')
     plt.xlabel('Lateral Acceleration [g]')
     plt.ylabel('Yaw Moment [Nm]')
-    plt.title('Yaw Moment Diagram')
+    plt.title('Yaw Moment Diagram - {:.1f} [m/s]'.format(simulation.velocity))
     plt.grid(True)
     plt.show()
     plt.savefig('ymd.png')

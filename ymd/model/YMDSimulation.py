@@ -6,6 +6,7 @@ class YMDSimulation:
     '''Class to represent YMD simulation parameters'''
 
     def __init__(self, params):
+        # Store all parameters in the same units as the config
         self.velocity = params['velocity']
 
         self.beta_min = params['beta_min']
@@ -20,7 +21,8 @@ class YMDSimulation:
 
     @property
     def velocity(self):
-        return self.__velocity
+        ''' Returns the forward velocity. Default unit is [m/s]'''
+        return self.__velocity/3.6
 
     @velocity.setter
     def velocity(self, velocity):
@@ -82,25 +84,12 @@ class YMDSimulation:
     def tolerance(self, tolerance):
         self.__tolerance = tolerance
 
-    '''Derived Properties'''
     @property
-    def beta_range(self, units=None):
+    def beta_range(self):
         value_range = np.arange(self.beta_min, self.beta_max, self.beta_increment)
-
-        if units is 'deg':
-            range_to_return = [value for value in value_range]
-        else:
-            range_to_return = [math.radians(value) for value in value_range]
-
-        return range_to_return
+        return [math.radians(value) for value in value_range]
 
     @property
-    def delta_range(self, units=None):
+    def delta_range(self):
         value_range = np.arange(self.delta_min, self.delta_max, self.delta_increment)
-
-        if units is 'deg':
-            range_to_return = [value for value in value_range]
-        else:
-            range_to_return = [math.radians(value) for value in value_range]
-
-        return range_to_return
+        return [math.radians(value) for value in value_range]
