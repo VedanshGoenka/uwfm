@@ -86,10 +86,10 @@ class YMDSimulation:
 
     @property
     def beta_range(self):
-        value_range = np.arange(self.beta_min, self.beta_max, self.beta_increment)
+        value_range = np.arange(self.beta_min, self.beta_max+1, self.beta_increment)
         return [math.radians(value) for value in value_range]
 
     @property
     def delta_range(self):
-        value_range = np.arange(self.delta_min, self.delta_max, self.delta_increment)
+        value_range = np.arange(self.delta_min, self.delta_max+1, self.delta_increment)
         return [math.radians(value) for value in value_range]

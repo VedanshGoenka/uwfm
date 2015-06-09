@@ -56,7 +56,6 @@ def build_simulation_params(simulation_config):
 def converge_lateral_acceleration(car, simulation, beta, delta, relaxation):
     # TODO: variable names that make more sense
         # Initialize variables
-        m_z = 0
         a_lat = 0
         a_lat_prev = 100
 
@@ -72,17 +71,25 @@ def converge_lateral_acceleration(car, simulation, beta, delta, relaxation):
             solution = car.calc_vehicle_forces(simulation.velocity, yaw_speed, a_lat, beta, delta)
 
             a_lat = solution.flat[1]/car.mass
-            m_z = solution.flat[2]
 
         return solution
 
 
-def ymd_calculator(simulation_config, vehicle_config, tire_config):
-    '''Generates a Yaw Moment Diagram using the given parameters in the config files'''
+def plot_ymd_results(result_ay, result_mz, simulation):
+    plt.plot(np.transpose(result_ay)[:][:],
+             np.transpose(result_mz)[:][:], color='black')
+    plt.plot(result_ay[:][:], result_mz[:][:], color='red')
 
-    # define test conditions
-    simulation = build_simulation_params(simulation_config)
-    car = build_vehicle_model(vehicle_config, tire_config)
+    plt.xlabel('Lateral Acceleration [g]')
+    plt.ylabel('Yaw Moment [Nm]')
+    plt.title('Yaw Moment Diagram - {:.1f} [m/s]'.format(simulation.velocity))
+    plt.grid(True)
+
+    plt.show()
+
+
+def ymd_calculator(car, simulation):
+    '''Generates a Yaw Moment Diagram using the given parameters in the config files'''
 
     # Initialize results arraw
     result_ay = np.empty([len(simulation.beta_range), len(simulation.delta_range)])
@@ -90,12 +97,6 @@ def ymd_calculator(simulation_config, vehicle_config, tire_config):
 
     for i, beta in enumerate(simulation.beta_range):
         for j, delta in enumerate(simulation.delta_range):
-            # Set static tire load
-            car.a_lat = 0
-            car.a_long = 0
-
-            car.delta = delta
-
             # Initialize variables
             relaxation = 0.5  # TODO: Move me somewhere else!
 
@@ -104,16 +105,17 @@ def ymd_calculator(simulation_config, vehicle_config, tire_config):
             result_ay[i][j] = solution.flat[1]/car.mass / 9.81
             result_mz[i][j] = solution.flat[2]
 
-    # Plot
-    plt.plot(np.transpose(result_ay)[:][:],
-             np.transpose(result_mz)[:][:], color='black')
-    plt.plot(result_ay[:][:], result_mz[:][:], color='red')
-    plt.xlabel('Lateral Acceleration [g]')
-    plt.ylabel('Yaw Moment [Nm]')
-    plt.title('Yaw Moment Diagram - {:.1f} [m/s]'.format(simulation.velocity))
-    plt.grid(True)
-    plt.show()
-    plt.savefig('ymd.png')
+    return result_ay, result_mz
+
+
+def ymd_calculator_wrapper(simulation_config, vehicle_config, tire_config):
+    '''Wrapper function that builds the models for us before calling ymd_calculator'''
+    simulation = build_simulation_params(simulation_config)
+    car = build_vehicle_model(vehicle_config, tire_config)
+
+    result_ay, result_mz = ymd_calculator(car, simulation)
+
+    return result_ay, result_mz, car, simulation
 
 
 def main():
@@ -124,7 +126,9 @@ def main():
     parser.add_argument('-o', '--output', type=str, required=False)
     args = parser.parse_args()
 
-    ymd_calculator(args.simulation_config, args.vehicle_config, args.tire_config)
+    results_ay, results_mz, vehicle_model, ymd_simulation = ymd_calculator_wrapper(args.simulation_config, args.vehicle_config, args.tire_config)
+
+    plot_ymd_results(results_ay, results_mz, ymd_simulation)
 
 
 if __name__ == "__main__":
