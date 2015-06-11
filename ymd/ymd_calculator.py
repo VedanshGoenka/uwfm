@@ -34,12 +34,15 @@ def build_vehicle_model(vehicle_config, tire_config):
     config = configparser.ConfigParser(inline_comment_prefixes=';')
     config.read(vehicle_config)
 
-    dimensions = {key: float(config['dimensions'][key]) for key in config['dimensions']}
+    
+    mass = {key: float(config['mass'][key]) for key in config['mass']}
+    geometry = {key: float(config['geometry'][key]) for key in config['geometry']}
+    suspension = {key: float(config['suspension'][key]) for key in config['suspension']}
 
     # TODO: allow flexible way to specify tires on all tires
     tire_model = build_tire_model(tire_config)
 
-    return Vehicle(tire_model, tire_model, tire_model, tire_model, dimensions)
+    return Vehicle(tire_model, tire_model, tire_model, tire_model, mass, geometry, suspension)
 
 
 def build_simulation_params(simulation_config):
