@@ -26,9 +26,7 @@ class Vehicle:
         self.trackwidth_rear = geometry['trackwidth_rear']
         self.rollcentre_front = geometry['rollcentre_front']
         self.rollcentre_rear = geometry['rollcentre_rear']
-
-        # Suspension
-        self.latloadtrnsfr_dist = suspension['latloadtrnsfr']  # lateral load transfer, distribution, front [%]
+# Suspension self.latloadtrnsfr_dist = suspension['latloadtrnsfr']  # lateral load transfer, distribution, front [%]
         self.arb_stiffness_ratio = suspension['arb_stiffness_ratio']
 
     '''Mass'''
@@ -154,6 +152,10 @@ class Vehicle:
     def calc_vertical_load(self, a_lat, a_long, mode=None):
         '''Calculate the tire vertical load with simplified weight transfer '''
 
+        # Wheel vertical load without weight transfer effects for a single whel
+        fz_front_wheel = -(9.81 * self.mass * self.weightdist_front / 2)
+        fz_rear_wheel = -(9.81 * self.mass * (1 - self.weightdist_front) / 2)
+
         if mode is 'simple':
             lat_trnsfr = (self.mass * self.cg_height * a_lat) / self.trackwidth
             # Unused for now
@@ -172,15 +174,24 @@ class Vehicle:
 
             nonsuspended_rear = self.nonsuspended_mass / 2 * a_lat * self.tire_rr.re / self.trackwidth_rear
             geometric_rear = ((1 - self.weightdist_front) * self.suspended_mass *
-                               a_lat * self.rollcentre_rear / self.trackwidth_rear)
-            elastic_rear = ((1 - self.arb_stiffness_ratio) * (1 - self.weightdist_front) * self.suspended_mass * 
-                             a_lat * (self.rollcentre_rear - self.cg_height) / self.trackwidth_rear)
+                              a_lat * self.rollcentre_rear / self.trackwidth_rear)
+            elastic_rear = ((1 - self.arb_stiffness_ratio) * (1 - self.weightdist_front) * self.suspended_mass *
+                            a_lat * (self.rollcentre_rear - self.cg_height) / self.trackwidth_rear)
             rear_lat_trnsfr = nonsuspended_rear + geometric_rear + elastic_rear
 
-        fz_fr = -(9.81 * self.mass * self.weightdist_front / 2) + front_lat_trnsfr
-        fz_fl = -(9.81 * self.mass * self.weightdist_front / 2) - front_lat_trnsfr
-        fz_rr = -(9.81 * self.mass * (1 - self.weightdist_front) / 2) + rear_lat_trnsfr
-        fz_rl = -(9.81 * self.mass * (1 - self.weightdist_front) / 2) - rear_lat_trnsfr
+        # Wheel lift assumption - for a given axle, wheel will take entire axle load
+        if math.fabs(front_lat_trnsfr) > math.fabs(fz_front_wheel):
+            front_lat_trnsfr = math.copysign(fz_front_wheel, front_lat_trnsfr)
+            print('Front Wheel Lift!')
+
+        if math.fabs(rear_lat_trnsfr) > math.fabs(fz_rear_wheel):
+            rear_lat_trnsfr = math.copysign(fz_rear_wheel, rear_lat_trnsfr)
+            print('Rear Wheel Lift!')
+
+        fz_fr = fz_front_wheel + front_lat_trnsfr
+        fz_fl = fz_front_wheel - front_lat_trnsfr
+        fz_rr = fz_rear_wheel + rear_lat_trnsfr
+        fz_rl = fz_rear_wheel - rear_lat_trnsfr
 
         return fz_fr, fz_fl, fz_rr, fz_rl
 

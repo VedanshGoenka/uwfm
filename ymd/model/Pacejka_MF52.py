@@ -156,7 +156,10 @@ class PacejkaMF52:
         if cEy > 1:
             cEy = 1
 
-        cBy = cKy/(cCy*cDy)
+        try:
+            cBy = cKy/(cCy*cDy)
+        except ZeroDivisionError:
+            cBy = 0
 
         # Prepare return structure
         params = {'cSHy': cSHy, 'cSVy': cSVy, 'cSAy': cSAy, 'cKy': cKy,
@@ -172,60 +175,72 @@ class PacejkaMF52:
               gamma  camber angle [rad]
               kappa  slip ratio
         '''
-        # Calculate lateral parameters
-        params = self.params_fy(f_z, alpha, kappa, gamma)
+        if f_z < 0:
+            # Calculate lateral parameters
+            params = self.params_fy(f_z, alpha, kappa, gamma)
 
-        # Base lateral force
-        fy0 = params['cDy'] \
-            * math.sin(params['cCy'] * math.atan(params['cBy'] * params['cSAy'] - params['cEy']
-                       * (params['cBy'] * params['cSAy'] - math.atan(params['cBy'] * params['cSAy'])))) \
-            + params['cSVy']
+            # Base lateral force
+            fy0 = params['cDy'] \
+                * math.sin(params['cCy'] * math.atan(params['cBy'] * params['cSAy'] - params['cEy']
+                           * (params['cBy'] * params['cSAy'] - math.atan(params['cBy'] * params['cSAy'])))) \
+                + params['cSVy']
 
-        # Combined weighing factor
-        cCyk = self.rCy1
-        cSHyk = self.rHy1 + self.rHy2 * self.fnorm(f_z)
-        cByk = self.rBy1 * math.cos(math.atan(self.rBy2 * (alpha - self.rBy3)))
-        cDVyk = params['cDy'] * (self.rVy1 + self.rVy2 * self.fnorm(f_z) + self.rVy3 * gamma) * math.cos(math.atan(self.rVy4 * alpha))
-        cSVyk = cDVyk * math.sin(self.rVy5 * math.atan(self.rVy6 * kappa))
-        cEyk = self.rEy1 + self.rEy2 * self.fnorm(f_z)
-        if cEyk > 1:
-            cEyk = 1
+            # Combined weighing factor
+            cCyk = self.rCy1
+            cSHyk = self.rHy1 + self.rHy2 * self.fnorm(f_z)
+            cByk = self.rBy1 * math.cos(math.atan(self.rBy2 * (alpha - self.rBy3)))
+            cDVyk = params['cDy'] * (self.rVy1 + self.rVy2 * self.fnorm(f_z) + self.rVy3 * gamma) * math.cos(math.atan(self.rVy4 * alpha))
+            cSVyk = cDVyk * math.sin(self.rVy5 * math.atan(self.rVy6 * kappa))
+            cEyk = self.rEy1 + self.rEy2 * self.fnorm(f_z)
+            if cEyk > 1:
+                cEyk = 1
 
-        cGyk = math.cos(cCyk * math.atan(cByk * kappa - cEyk * (cByk * kappa - math.atan(cByk * kappa)))) \
-             / math.cos(cCyk * math.atan(cByk * cSHyk - cEyk * (cByk * cSHyk - math.atan(cByk * cSHyk))))
+            cGyk = math.cos(cCyk * math.atan(cByk * kappa - cEyk * (cByk * kappa - math.atan(cByk * kappa)))) \
+                / math.cos(cCyk * math.atan(cByk * cSHyk - cEyk * (cByk * cSHyk - math.atan(cByk * cSHyk))))
 
-        return cGyk * fy0 + cSVyk
+            fy = cGyk * fy0 + cSVyk
+
+        else:
+            fy = 0
+
+        return fy
 
     def calc_mz(self, fz, alpha, kappa, gamma):
-        # Pneumatic trail
-        fy = self.calc_fy(fz, alpha, gamma, kappa)
+        if fz < 0:
+            # Pneumatic trail
+            fy = self.calc_fy(fz, alpha, gamma, kappa)
 
-        cSHt = self.qHz1 + self.qHz2 * self.fnorm(fz) + (self.qHz3 + self.qHz4 * self.fnorm(fz)) * gamma
-        cSAt = alpha + cSHt
+            cSHt = self.qHz1 + self.qHz2 * self.fnorm(fz) + (self.qHz3 + self.qHz4 * self.fnorm(fz)) * gamma
+            cSAt = alpha + cSHt
 
-        cDt = fz * (self.qDz1 + self.qDz2 * self.fnorm(fz)) * (1 + self.qDz3 * gamma + self.qDz4 * gamma * gamma) * (self.r0 / self.fnomin)
-        cCt = self.qCz1
-        cBt = (self.qBz1 + self.qBz2 * self.fnorm(fz) + self.qBz3 * self.fnorm(fz) ** 2) * (1 + self.qBz4 * gamma + self.qBz5 * math.fabs(gamma)) / self.uy
-        if cBt < 0:
-            cBt = 0
+            cDt = fz * (self.qDz1 + self.qDz2 * self.fnorm(fz)) * (1 + self.qDz3 * gamma + self.qDz4 * gamma * gamma) * (self.r0 / self.fnomin)
+            cCt = self.qCz1
+            cBt = (self.qBz1 + self.qBz2 * self.fnorm(fz) + self.qBz3 * self.fnorm(fz) ** 2) * (1 + self.qBz4 * gamma + self.qBz5 * math.fabs(gamma)) / self.uy
+            if cBt < 0:
+                cBt = 0
 
-        cEt = (self.qEz1 + self.qEz2 * self.fnorm(fz) + self.qEz3 * self.fnorm(fz) ** 2) * (1 + (self.qEz4 + self.qEz5 * gamma) * math.atan(cBt * cCt * cSAt))
-        if cEt > 1:
-            cEt = 1
+            cEt = (self.qEz1 + self.qEz2 * self.fnorm(fz) + self.qEz3 * self.fnorm(fz) ** 2) * (1 + (self.qEz4 + self.qEz5 * gamma) * math.atan(cBt * cCt * cSAt))
+            if cEt > 1:
+                cEt = 1
 
-        t = cDt * math.cos(cCt * math.atan(cBt * cSAt - cEt * (cBt * cSAt - math.atan(cBt * cSAt)))) * math.cos(alpha)
+            t = cDt * math.cos(cCt * math.atan(cBt * cSAt - cEt * (cBt * cSAt - math.atan(cBt * cSAt)))) * math.cos(alpha)
 
-        # Residual moment
-        # This is highly inefficient since we are going through the same calculation multiple times
-        param_y = self.params_fy(fz, alpha, gamma, kappa)
+            # Residual moment
+            # This is highly inefficient since we are going through the same calculation multiple times
+            param_y = self.params_fy(fz, alpha, gamma, kappa)
 
-        cSHf = param_y['cSHy'] + param_y['cSVy'] / param_y['cKy']
-        cSAr = alpha + cSHf
+            cSHf = param_y['cSHy'] + param_y['cSVy'] / param_y['cKy']
+            cSAr = alpha + cSHf
 
-        cBr = self.qBz9/self.uy + self.qBz10 * param_y['cBy'] * param_y['cCy']
-        cDr = fz * ((self.qDz6 + self.qDz7 * self.fnorm(fz)) + (self.qDz8 + self.qDz9 * self.fnorm(fz)) * gamma) * self.r0 * math.cos(alpha) * self.uy
+            cBr = self.qBz9/self.uy + self.qBz10 * param_y['cBy'] * param_y['cCy']
+            cDr = fz * ((self.qDz6 + self.qDz7 * self.fnorm(fz)) + (self.qDz8 + self.qDz9 * self.fnorm(fz)) * gamma) * self.r0 * math.cos(alpha) * self.uy
 
-        cMzr = cDr * math.cos(math.atan(cBr * cSAr))
+            cMzr = cDr * math.cos(math.atan(cBr * cSAr))
 
-        # Pure side slip for now
-        return -t * fy + cMzr
+            # Pure side slip for now
+            mz = -t * fy + cMzr
+
+        else:
+            mz = 0
+
+        return mz

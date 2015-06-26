@@ -34,7 +34,6 @@ def build_vehicle_model(vehicle_config, tire_config):
     config = configparser.ConfigParser(inline_comment_prefixes=';')
     config.read(vehicle_config)
 
-    
     mass = {key: float(config['mass'][key]) for key in config['mass']}
     geometry = {key: float(config['geometry'][key]) for key in config['geometry']}
     suspension = {key: float(config['suspension'][key]) for key in config['suspension']}
