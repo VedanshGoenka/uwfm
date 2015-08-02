@@ -295,7 +295,7 @@ class Vehicle:
         roll_equation = lambda theta: self.calc_roll_moment(theta) - roll_moment
         roll_angle = fsolve(roll_equation, 0)
        
-        return roll_angle
+        return roll_angle.flat[0]
 
     def calc_camber_angles(self, a_lat):
         '''Calculate the tire camber variation using constant VSAL approximation'''
@@ -312,12 +312,12 @@ class Vehicle:
         displacement_rear = self.trackwidth_rear / 2 * math.tan(roll_angle)
 
         # Inclination angle in the 'vehicle' frame of reference
-        inclination_fr = math.atan(displacement_front / self.vsal_front)
-        inclination_fl = -math.atan(displacement_front / self.vsal_front)
-        inclination_rr = math.atan(displacement_rear / self.vsal_rear)
-        inclination_rl = -math.atan(displacement_rear / self.vsal_rear)
+        gamma_fr = -roll_angle + math.atan(displacement_front / self.vsal_front)
+        gamma_fl = roll_angle - math.atan(displacement_front / self.vsal_front)
+        gamma_rr = -roll_angle + math.atan(displacement_rear / self.vsal_rear)
+        gamma_rl = roll_angle - math.atan(displacement_rear / self.vsal_rear)
 
-        return Quartet(inclination_fr, inclination_fl, inclination_rr, inclination_rl)
+        return Quartet(gamma_fr, gamma_fl, gamma_rr, gamma_rl)
 
     def calc_slip_angles(self, velocity, yaw_speed, beta):
         '''Calculate the tire slip angles'''
@@ -359,6 +359,7 @@ class Vehicle:
 
         alpha = self.calc_slip_angles(velocity, yaw_speed, beta)
         gamma = self.calc_camber_angles(a_lat)
+        print(gamma.fr, gamma.fl, gamma.rr, gamma.rl)
         fz = self.calc_vertical_load(a_lat, 0)  # assume a_long is zero
         fy = self.calc_lateral_forces(fz, alpha, delta, gamma)
         mz = self.calc_self_aligning(fz, alpha, delta, gamma)
