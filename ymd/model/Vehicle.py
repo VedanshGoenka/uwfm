@@ -6,6 +6,7 @@ from scipy.optimize import fsolve
 
 class Quartet:
     '''An arbitrary class that holds the four corner values of a car.'''
+
     def __init__(self, fr, fl, rr, rl):
         self.quartet = [fr, fl, rr, rl]
 
@@ -38,14 +39,9 @@ class Quartet:
 
 
 class Vehicle:
-    def __init__(self, tire_fr, tire_fl, tire_rr, tire_rl, mass, geometry, suspension):
-        # TODO: The parameter naming sucks
-
+    def __init__(self, tires, mass, geometry, suspension):
         # Tires
-        self.tire_fr = tire_fr
-        self.tire_fl = tire_fl
-        self.tire_rr = tire_rr
-        self.tire_rl = tire_rl
+        self.tires = tires  # TODO: protect this data member
 
         # General
         self.suspended_mass = mass['suspended_mass']
@@ -69,10 +65,6 @@ class Vehicle:
         self.cornerspring_rear = suspension['cornerspring_rear']
         self.antirollstiffness_front = suspension['antirollstiffness_front']
         self.antirollstiffness_rear = suspension['antirollstiffness_rear']
-
-        self.latloadtrnsfr_dist = suspension['latloadtrnsfr']  # lateral load transfer, distribution, front [%]
-        self.roll_stiffness = suspension['roll_stiffness']
-        self.arb_stiffness_ratio = suspension['arb_stiffness_ratio']
 
     '''Mass'''
     @property
@@ -228,33 +220,51 @@ class Vehicle:
 
     @property
     def antiroll_distribution(self):
+        '''Calculates the anti-roll stiffness calculation. This is also known as the first magic number'''
+
         stiffness_front = self.cornerspring_front + self.antirollstiffness_front
         stiffness_rear = self.cornerspring_rear + self.antirollstiffness_rear
         return stiffness_front / (stiffness_front + stiffness_rear)
 
     def calc_lat_load_transfer(self, a_lat):
-        # Calculate the load transfer on the front axle. WARNING: lots of assumptions being made here!
-        nonsuspended_front = self.nonsuspended_mass / 2 * a_lat * self.tire_fr.re / self.trackwidth_front
-        geometric_front = (self.weightdist_front * self.suspended_mass *
-                           a_lat * self.rollcentre_front / self.trackwidth_front)
-        elastic_front = (self.antiroll_distribution * self.suspended_mass *
-                         a_lat * (self.rollcentre_front - self.cg_height) / self.trackwidth_front)
+        '''
+        Calculate the lateral load transfer using the OptimumG Seminar method.
+        Several simplifying assumptions are made in the calculation.
+        - Non-suspended mass CG is located at the centre of the tire
+        - Excludes the tire stiffness when calculating the elastic weight transfer
+        - Constant CG and roll centre locations
+        '''
 
-        nonsuspended_rear = self.nonsuspended_mass / 2 * a_lat * self.tire_rr.re / self.trackwidth_rear
-        geometric_rear = ((1 - self.weightdist_front) * self.suspended_mass *
-                          a_lat * self.rollcentre_rear / self.trackwidth_rear)
-        elastic_rear = ((1 - self.antiroll_distribution) * self.suspended_mass *
-                        a_lat * (self.rollcentre_rear - self.cg_height) / self.trackwidth_rear)
+        # Weight transfer at the front axle
+        nonsuspended_front = self.nonsuspended_mass / 2 * a_lat * self.tires.fr.re / self.trackwidth_front
+        geometric_front = self.weightdist_front * self.suspended_mass * a_lat * self.rollcentre_front / self.trackwidth_front
+        elastic_front = self.antiroll_distribution * self.suspended_mass * a_lat * (self.rollcentre_front - self.cg_height) / self.trackwidth_front
 
-        return nonsuspended_front, geometric_front, elastic_front, nonsuspended_rear, geometric_rear, elastic_rear
+        # Weight transfer at the rear axle
+        nonsuspended_rear = self.nonsuspended_mass / 2 * a_lat * self.tires.rr.re / self.trackwidth_rear
+        geometric_rear = (1 - self.weightdist_front) * self.suspended_mass * a_lat * self.rollcentre_rear / self.trackwidth_rear
+        elastic_rear = (1 - self.antiroll_distribution) * self.suspended_mass * a_lat * (self.rollcentre_rear - self.cg_height) / self.trackwidth_rear
+
+        # Package the components nicely in a dictionary
+        loadtransfer = {'nonsuspended_front': nonsuspended_front,
+                        'geometric_front': geometric_front,
+                        'elastic_front': elastic_front,
+                        'nonsuspended_rear': nonsuspended_rear,
+                        'geometric_rear': geometric_rear,
+                        'elastic_rear': elastic_rear
+                        }
+
+        # Return all components of the weight transfer. Think of a better name for this.
+        return loadtransfer
 
     def calc_vertical_load(self, a_lat, a_long, mode=None):
         '''Calculate the tire vertical load'''
-        nonsuspended_front, geometric_front, elastic_front, nonsuspended_rear, geometric_rear, elastic_rear = self.calc_lat_load_transfer(a_lat)
+
+        loadtransfer = self.calc_lat_load_transfer(a_lat)
 
         # Sum the components of the weight transfer
-        front_lat_trnsfr = nonsuspended_front + geometric_front + elastic_front
-        rear_lat_trnsfr = nonsuspended_rear + geometric_rear + elastic_rear
+        front_lat_trnsfr = loadtransfer['nonsuspended_front'] + loadtransfer['geometric_front'] + loadtransfer['elastic_front']
+        rear_lat_trnsfr = loadtransfer['nonsuspended_rear'] + loadtransfer['geometric_rear'] + loadtransfer['elastic_rear']
 
         # Wheel vertical load without weight transfer effects for a single whel
         fz_front_wheel = -(9.81 * self.mass * self.weightdist_front / 2)
@@ -263,11 +273,9 @@ class Vehicle:
         # Wheel lift assumption - for a given axle, wheel will take entire axle load
         if math.fabs(front_lat_trnsfr) > math.fabs(fz_front_wheel):
             front_lat_trnsfr = math.copysign(fz_front_wheel, front_lat_trnsfr)
-            print('Front Wheel Lift!')
 
         if math.fabs(rear_lat_trnsfr) > math.fabs(fz_rear_wheel):
             rear_lat_trnsfr = math.copysign(fz_rear_wheel, rear_lat_trnsfr)
-            print('Rear Wheel Lift!')
 
         fz_fr = fz_front_wheel + front_lat_trnsfr
         fz_fl = fz_front_wheel - front_lat_trnsfr
@@ -278,6 +286,7 @@ class Vehicle:
 
     def calc_roll_moment(self, theta):
         '''Calculate the antiroll stiffness for a given roll angle in radians'''
+
         wheelrate_front = self.cornerspring_front + self.antirollstiffness_front
         wheelrate_rear = self.cornerspring_rear + self.antirollstiffness_rear
 
@@ -288,13 +297,14 @@ class Vehicle:
 
     def calc_roll_angle(self, a_lat):
         '''Calculate the chassis roll angle when subjected to a lateral acceleration'''
-        nonsuspended_front, geometric_front, elastic_front, nonsuspended_rear, geometric_rear, elastic_rear = self.calc_lat_load_transfer(a_lat)
+
+        loadtransfer = self.calc_lat_load_transfer(a_lat)
 
         # Calculate the total roll moment to be reacted
-        roll_moment = elastic_front * self.trackwidth_front + elastic_rear * self.trackwidth_rear
+        roll_moment = loadtransfer['elastic_front'] * self.trackwidth_front + loadtransfer['elastic_rear'] * self.trackwidth_rear
         roll_equation = lambda theta: self.calc_roll_moment(theta) - roll_moment
         roll_angle = fsolve(roll_equation, 0)
-       
+
         return roll_angle.flat[0]
 
     def calc_camber_angles(self, a_lat):
@@ -304,10 +314,6 @@ class Vehicle:
         roll_angle = self.calc_roll_angle(a_lat)
 
         # With the roll angle known, determine the vertical displacment required to return the wheel
-        # TODO: Questions to ask yourself
-        # What is the difference between this calculation and using the roll moment to calculate displacement?
-        # How does this effect calculations when there is wheel lift?
-        # Can we cut down on the number of calculations? Is this a repeated operation?
         displacement_front = self.trackwidth_front / 2 * math.tan(roll_angle)
         displacement_rear = self.trackwidth_rear / 2 * math.tan(roll_angle)
 
@@ -334,23 +340,21 @@ class Vehicle:
     def calc_lateral_forces(self, fz, alpha, delta, gamma):
         '''Calculate the lateral force generated by the tires'''
 
-        # Reminder: gamma is inclination angle
-
         # Ignore camber effects for now
-        fy_fr = self.tire_fr.calc_fy(fz.fr, alpha.fr+delta, 0, -gamma.fr)
-        fy_fl = -self.tire_fl.calc_fy(fz.fl, -(alpha.fl+delta), 0, -gamma.fl)
-        fy_rr = self.tire_rr.calc_fy(fz.rr, alpha.rr, 0, -gamma.rr)
-        fy_rl = -self.tire_rl.calc_fy(fz.rl, -alpha.rl, 0, -gamma.rl)
+        fy_fr = self.tires.fr.calc_fy(fz.fr, alpha.fr+delta, 0, -gamma.fr)
+        fy_fl = -self.tires.fl.calc_fy(fz.fl, -(alpha.fl+delta), 0, -gamma.fl)
+        fy_rr = self.tires.rr.calc_fy(fz.rr, alpha.rr, 0, -gamma.rr)
+        fy_rl = -self.tires.rl.calc_fy(fz.rl, -alpha.rl, 0, -gamma.rl)
 
         return Quartet(fy_fr, fy_fl, fy_rr, fy_rl)
 
     def calc_self_aligning(self, fz, alpha, delta, gamma):
         '''Calculate the self aligning torque generated by the tires'''
 
-        mz_fr = self.tire_fr.calc_mz(fz.fr, alpha.fr+delta, 0, -gamma.fr)
-        mz_fl = -self.tire_fl.calc_mz(fz.fl, -(alpha.fl+delta), 0, -gamma.fl)
-        mz_rr = self.tire_rr.calc_mz(fz.rr, alpha.rr, 0, -gamma.rr)
-        mz_rl = -self.tire_rl.calc_mz(fz.rl, -alpha.rl, 0, -gamma.rl)
+        mz_fr = self.tires.fr.calc_mz(fz.fr, alpha.fr+delta, 0, -gamma.fr)
+        mz_fl = -self.tires.fl.calc_mz(fz.fl, -(alpha.fl+delta), 0, -gamma.fl)
+        mz_rr = self.tires.rr.calc_mz(fz.rr, alpha.rr, 0, -gamma.rr)
+        mz_rl = -self.tires.rl.calc_mz(fz.rl, -alpha.rl, 0, -gamma.rl)
 
         return Quartet(mz_fr, mz_fl, mz_rr, mz_rl)
 
@@ -359,7 +363,7 @@ class Vehicle:
 
         alpha = self.calc_slip_angles(velocity, yaw_speed, beta)
         gamma = self.calc_camber_angles(a_lat)
-        print(gamma.fr, gamma.fl, gamma.rr, gamma.rl)
+
         fz = self.calc_vertical_load(a_lat, 0)  # assume a_long is zero
         fy = self.calc_lateral_forces(fz, alpha, delta, gamma)
         mz = self.calc_self_aligning(fz, alpha, delta, gamma)
@@ -385,8 +389,10 @@ class Vehicle:
         # FR, FL, RR, RL
         forces = np.matrix([[fy.fr], [fy.fl], [fy.rr], [fy.rl]])
 
-        # TODO: Find a better name for this
+        # Rotate forces and moments to the vehicle frame of reference
         resolved = matrix * forces
+
+        # Add in the self-aligning torques
         resolved.flat[2] = resolved.flat[2] + mz.fr + mz.fl + mz.rr + mz.rl
 
         return resolved

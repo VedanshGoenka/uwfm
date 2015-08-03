@@ -18,6 +18,7 @@ class YMDSimulation:
         self.delta_increment = params['delta_increment']
 
         self.tolerance = params['tolerance']
+        self.relaxation = params['relaxation']
 
     @property
     def velocity(self):
@@ -83,6 +84,14 @@ class YMDSimulation:
     @tolerance.setter
     def tolerance(self, tolerance):
         self.__tolerance = tolerance
+
+    @property
+    def relaxation(self):
+        return self.__relaxation
+
+    @relaxation.setter
+    def relaxation(self, relaxation):
+        self.__relaxation = relaxation
 
     @property
     def beta_range(self):

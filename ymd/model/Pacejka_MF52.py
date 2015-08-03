@@ -13,7 +13,7 @@ class PacejkaMF52:
     http://www.optimumg.com/docs/OptimumTire_Help_File.pdf
     '''
 
-    def __init__(self, general, py, qz, px, qx, rx, ry, sz, qy):
+    def __init__(self, general, u, py, qz, px, qx, rx, ry, sz, qy):
         '''
         Initialize tire coefficients. Coefficients are categorized by
         type as per the OptimumTire documentation. The categeories are
@@ -23,6 +23,7 @@ class PacejkaMF52:
 
         Inputs
         general: general data
+              u: scaling factors
              py: pure lateral
              qz: aligning torque
              px: pure lognitudinal
@@ -32,8 +33,8 @@ class PacejkaMF52:
              sz: combined aligning torque
              qy: roll moment
         '''
-        # Hard code this for now
-        self.uy = 0.7
+        self.ux = u['ux']
+        self.uy = u['uy']
 
         self.fnomin = general['fnomin']
         self.re = general['re']

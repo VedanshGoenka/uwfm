@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from model.Pacejka_MF52 import PacejkaMF52 as Pacejka
+from model.Vehicle import Quartet
 from model.Vehicle import Vehicle
 from model.YMDSimulation import YMDSimulation
 
@@ -16,6 +17,7 @@ def build_tire_model(filename):
     config.read(filename)
 
     general = {key: float(config['general'][key]) for key in config['general']}
+    u = {key: float(config['scaling'][key]) for key in config['scaling']}
     py = {key: float(config['lateral'][key]) for key in config['lateral']}
     qz = {key: float(config['self_aligning'][key]) for key in config['self_aligning']}
     px = {key: float(config['longitudinal'][key]) for key in config['longitudinal']}
@@ -25,7 +27,7 @@ def build_tire_model(filename):
     sz = {key: float(config['self_aligning_combined'][key]) for key in config['self_aligning_combined']}
     qy = {key: float(config['roll_moment'][key]) for key in config['roll_moment']}
 
-    return Pacejka(general, py, qz, px, qx, rx, ry, sz, qy)
+    return Pacejka(general, u, py, qz, px, qx, rx, ry, sz, qy)
 
 
 def build_vehicle_model(vehicle_config, tire_config):
@@ -38,10 +40,10 @@ def build_vehicle_model(vehicle_config, tire_config):
     geometry = {key: float(config['geometry'][key]) for key in config['geometry']}
     suspension = {key: float(config['suspension'][key]) for key in config['suspension']}
 
-    # TODO: allow flexible way to specify tires on all tires
     tire_model = build_tire_model(tire_config)
+    tires = Quartet(tire_model, tire_model, tire_model, tire_model)  # same tires on all four corners
 
-    return Vehicle(tire_model, tire_model, tire_model, tire_model, mass, geometry, suspension)
+    return Vehicle(tires, mass, geometry, suspension)
 
 
 def build_simulation_params(simulation_config):
@@ -55,26 +57,27 @@ def build_simulation_params(simulation_config):
     return YMDSimulation(simulation_params)
 
 
-def converge_lateral_acceleration(car, simulation, beta, delta, relaxation):
-    # TODO: variable names that make more sense
-        # Initialize variables
-        a_lat = 0
-        a_lat_prev = 100
+def converge_lateral_acceleration(car, simulation, beta, delta):
+    '''Iterates vehicle model until the lateral acceleration converges'''
 
-        # Iterate until we are within the allowed tolerance
-        while math.fabs(a_lat - a_lat_prev) > simulation.tolerance:
-            # Relaxation to allow convergence at low speeds
-            a_lat = a_lat * relaxation + a_lat_prev * (1 - relaxation)
-            a_lat_prev = a_lat
+    # Initialize variables
+    a_lat = 0
+    a_lat_prev = 100
 
-            # Calculate vehicle yaw speed
-            yaw_speed = a_lat/simulation.velocity
+    # Iterate until we are within the allowed tolerance
+    while math.fabs(a_lat - a_lat_prev) > simulation.tolerance:
+        # Relaxation to allow convergence at low speeds
+        a_lat = a_lat * simulation.relaxation + a_lat_prev * (1 - simulation.relaxation)
+        a_lat_prev = a_lat
 
-            solution = car.calc_vehicle_forces(simulation.velocity, yaw_speed, a_lat, beta, delta)
+        # Calculate vehicle yaw speed
+        yaw_speed = a_lat/simulation.velocity
 
-            a_lat = solution.flat[1]/car.mass
+        solution = car.calc_vehicle_forces(simulation.velocity, yaw_speed, a_lat, beta, delta)
 
-        return solution
+        a_lat = solution.flat[1]/car.mass
+
+    return solution
 
 
 def plot_ymd_results(result_ay, result_mz, simulation):
@@ -97,12 +100,10 @@ def ymd_calculator(car, simulation):
     result_ay = np.empty([len(simulation.beta_range), len(simulation.delta_range)])
     result_mz = np.empty([len(simulation.beta_range), len(simulation.delta_range)])
 
+    # Sweep through all the combinations of beta and delta and solve
     for i, beta in enumerate(simulation.beta_range):
         for j, delta in enumerate(simulation.delta_range):
-            # Initialize variables
-            relaxation = 0.5  # TODO: Move me somewhere else!
-
-            solution = converge_lateral_acceleration(car, simulation, beta, delta, relaxation)
+            solution = converge_lateral_acceleration(car, simulation, beta, delta)
 
             result_ay[i][j] = solution.flat[1]/car.mass / 9.81
             result_mz[i][j] = solution.flat[2]
