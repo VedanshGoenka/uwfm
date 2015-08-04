@@ -134,6 +134,79 @@ class PacejkaMF52:
         '''
         return (f_z - self.fnomin) / self.fnomin
 
+    def params_fx(self, f_z, alpha, kappa, gamma):
+        '''
+        Calculates magic formula parameters for longitudinal force calculations, F_x
+        where f_z    vertical tire load [N]
+              alpha  slip angle [rad]
+              gamma  camber angle [rad]
+              kappa  slip ratio
+        '''
+
+        # Shift Factors
+        cSHx = (self.pHx1 + self.pHx2 * self.fnorm(f_z))
+        cSVx = f_z * (self.pVx1 + self.pVx2 * self.fnorm(f_z)) * self.ux
+
+        # Effective slip ratio
+        cSRx = kappa + cSHx
+
+        # Shape factors
+        cKx = f_z * (self.pKx1 + self.pKx2 * self.fnorm(f_z) * math.exp(self.pKx3 * self.fnorm(f_z)))
+        cCx = self.pCx1
+        cDx = f_z * (self.pDx1 + self.pDx2 * self.fnorm(f_z)) * self.ux
+        cEx = (self.pEx1 + self.pEx2 * self.fnorm(f_z) + self.pEx3 * self.fnorm(f_z) ** 2) * (1 - self.pEx4 * math.copysign(1, kappa))
+        if cEx > 1:
+            cEx = 1
+
+        try:
+            cBx = cKx / (cCx * cDx)
+        except ZeroDivisionError:
+            cBx = 0
+
+        # Prepare return structure
+        params = {'cSHx': cSHx, 'cSVx': cSVx, 'cSRx': cSRx, 'cKx': cKx,
+                  'cCx': cCx, 'cDx': cDx, 'cEx': cEx, 'cBx': cBx}
+
+        return params
+
+    def calc_fx(self, f_z, alpha, kappa, gamma):
+        '''
+        Calculates tire force, F_x
+        where f_z    vertical tire load [N]
+              alpha  slip angle [rad]
+              gamma  camber angle [rad]
+              kappa  slip ratio
+        '''
+        if f_z < 0:
+            # Calculate longitudinal parameters
+            params = self.params_fx(f_z, alpha, kappa, gamma)
+
+            # Base longitudinal force
+            fx0 = params['cDx'] \
+                * math.sin(params['cCx'] * math.atan(params['cBx'] * params['cSRx'] - params['cEx']
+                           * (params['cBx'] * params['cSRx'] - math.atan(params['cBx'] * params['cSRx'])))) \
+                + params['cSVx']
+
+            # Combined weighing factor
+            cSHxa = self.rHx1
+            cCxa = self.rCx1
+            cBxa = self.rBx1 * math.cos(math.atan(self.rBx2 * kappa))
+            cExa = self.rEx1 + self.rEx2 * self.fnorm(f_z)
+            if cExa > 1:
+                cExa = 1
+
+            cSRs = alpha + cSHxa
+
+            cGxa = math.cos(cCxa * math.atan(cBxa * cSRs - cExa * (cBxa * cSRs - math.atan(cBxa * cSRs)))) \
+                / math.cos(cCxa * math.atan(cBxa * cSHxa - cExa * (cBxa * cSHxa - math.atan(cBxa * cSHxa))))
+
+            fx = cGxa * fx0
+
+        else:
+            fx = 0
+
+        return fx
+
     def params_fy(self, f_z, alpha, kappa, gamma):
         '''
         Calculates magic formula parameters for lateral force calculations, F_y
@@ -208,11 +281,12 @@ class PacejkaMF52:
 
     def calc_mz(self, fz, alpha, kappa, gamma):
         if fz < 0:
+            # TODO: are we using alpha*, kappa* and gamma*?
             # Pneumatic trail
             fy = self.calc_fy(fz, alpha, gamma, kappa)
 
             cSHt = self.qHz1 + self.qHz2 * self.fnorm(fz) + (self.qHz3 + self.qHz4 * self.fnorm(fz)) * gamma
-            cSAt = alpha + cSHt
+            cSAt = math.tan(alpha) + cSHt
 
             cDt = fz * (self.qDz1 + self.qDz2 * self.fnorm(fz)) * (1 + self.qDz3 * gamma + self.qDz4 * gamma * gamma) * (self.r0 / self.fnomin)
             cCt = self.qCz1
@@ -223,6 +297,9 @@ class PacejkaMF52:
             cEt = (self.qEz1 + self.qEz2 * self.fnorm(fz) + self.qEz3 * self.fnorm(fz) ** 2) * (1 + (self.qEz4 + self.qEz5 * gamma) * math.atan(cBt * cCt * cSAt))
             if cEt > 1:
                 cEt = 1
+
+            # Calculate equivalent cSAt with longitudinal slip
+            # TODO: implement longitudinal dynamics first
 
             t = cDt * math.cos(cCt * math.atan(cBt * cSAt - cEt * (cBt * cSAt - math.atan(cBt * cSAt)))) * math.cos(alpha)
 
@@ -237,6 +314,9 @@ class PacejkaMF52:
             cDr = fz * ((self.qDz6 + self.qDz7 * self.fnorm(fz)) + (self.qDz8 + self.qDz9 * self.fnorm(fz)) * gamma) * self.r0 * math.cos(alpha) * self.uy
 
             cMzr = cDr * math.cos(math.atan(cBr * cSAr))
+
+            # Longitudinal factor
+            s = self.r0 * (self.sSz1 * self.sSz2 * (fy / self.fnomin) + (self.sSz3 + self.sSz4 * self.fnorm(fz) * math.sin(gamma)))
 
             # Pure side slip for now
             mz = -t * fy + cMzr
