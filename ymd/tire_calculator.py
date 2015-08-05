@@ -29,9 +29,9 @@ def main():
     alpha_sweep = np.arange(-20, 21)
     kappa_sweep = np.arange(-0.3, 0.3, 0.01)
 
-    force_x = [tire_model.calc_fx(-22*9.81*4, 0, kappa, 0) for kappa in kappa_sweep]
-    force_y = [tire_model.calc_fy(-22*9.81*4, math.radians(alpha), 0, 0) for alpha in alpha_sweep]
-    mom_z = [tire_model.calc_mz(-22*9.81*4, math.radians(alpha), 0, 0) for alpha in alpha_sweep]
+    force_x = [tire_model.calc_fx(-22*9.81*3, 0, kappa, 0) for kappa in kappa_sweep]
+    force_y = [tire_model.calc_fy(-22*9.81*3, math.radians(alpha), 0, 0) for alpha in alpha_sweep]
+    mom_z = [tire_model.calc_mz(-22*9.81*3, math.radians(alpha), 0, 0) for alpha in alpha_sweep]
 
     # Result
     print(force_x)
