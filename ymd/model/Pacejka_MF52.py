@@ -153,7 +153,7 @@ class PacejkaMF52:
         # Shape factors
         cKx = f_z * (self.pKx1 + self.pKx2 * self.fnorm(f_z) * math.exp(self.pKx3 * self.fnorm(f_z)))
         cCx = self.pCx1
-        cDx = f_z * (self.pDx1 + self.pDx2 * self.fnorm(f_z)) * self.ux
+        cDx = f_z * (self.pDx1 + self.pDx2 * self.fnorm(f_z)) * (1 - self.pDx3 * gamma **  2)* self.ux
         cEx = (self.pEx1 + self.pEx2 * self.fnorm(f_z) + self.pEx3 * self.fnorm(f_z) ** 2) * (1 - self.pEx4 * math.copysign(1, kappa))
         if cEx > 1:
             cEx = 1
@@ -241,9 +241,9 @@ class PacejkaMF52:
 
         return params
 
-    def calc_fy(self, f_z, alpha, kappa, gamma):
+    def fy_wrapper(self, f_z, alpha, kappa, gamma):
         '''
-        Calculates tire force, F_y
+        Wrapper function that calculates fy and fy'
         where f_z    vertical tire load [N]
               alpha  slip angle [rad]
               gamma  camber angle [rad]
@@ -277,17 +277,58 @@ class PacejkaMF52:
         else:
             fy = 0
 
-        return fy
+        # Return two items, the latter being used for the self-aligning torque calculation
+        return fy, fy - cSVyk
+        '''
+        Calculates tire force, F_y.
+        where f_z    vertical tire load [N]
+              alpha  slip angle [rad]
+              gamma  camber angle [rad]
+              kappa  slip ratio
+        '''
+
+    def calc_fy(self, f_z, alpha, kappa, gamma):
+        '''
+        Calculates tire force, F_y.
+        where f_z    vertical tire load [N]
+              alpha  slip angle [rad]
+              gamma  camber angle [rad]
+              kappa  slip ratio
+        '''
+        return self.fy_wrapper(f_z, alpha, kappa, gamma)[0]
+
+    def calc_fy_prime(self, f_z, alpha, kappa, gamma):
+        '''
+        Calculates F_y' for self-aligning torque calculation
+        where f_z    vertical tire load [N]
+              alpha  slip angle [rad]
+              gamma  camber angle [rad]
+              kappa  slip ratio
+        '''
+        return self.fy_wrapper(f_z, alpha, kappa, gamma)[1]
 
     def calc_mz(self, fz, alpha, kappa, gamma):
         if fz < 0:
             # TODO: are we using alpha*, kappa* and gamma*?
-            # Pneumatic trail
-            fy = self.calc_fy(fz, alpha, gamma, kappa)
+            # TODO: re-organize this huge mess of a function
 
+            # Get pure longitudinal and lateral coefficients
+            param_x = self.params_fx(fz, alpha, gamma, kappa)
+            param_y = self.params_fy(fz, alpha, gamma, kappa)
+
+            # Calculate base tire forces
+            fx = self.calc_fx(fz, alpha, gamma, kappa)
+            fy = self.calc_fx(fz, alpha, gamma, kappa)
+
+            # Calculate the tire Mz contribution from the pneumatic trail
+            # Find Fy'
+            fy_prime = self.calc_fy_prime(fz, alpha, gamma, kappa)
+
+            # Pneumatic trail shift factors and slip angle
             cSHt = self.qHz1 + self.qHz2 * self.fnorm(fz) + (self.qHz3 + self.qHz4 * self.fnorm(fz)) * gamma
             cSAt = math.tan(alpha) + cSHt
 
+            # Pneumatic trail shape factors
             cDt = fz * (self.qDz1 + self.qDz2 * self.fnorm(fz)) * (1 + self.qDz3 * gamma + self.qDz4 * gamma * gamma) * (self.r0 / self.fnomin)
             cCt = self.qCz1
             cBt = (self.qBz1 + self.qBz2 * self.fnorm(fz) + self.qBz3 * self.fnorm(fz) ** 2) * (1 + self.qBz4 * gamma + self.qBz5 * math.fabs(gamma)) / self.uy
@@ -298,28 +339,37 @@ class PacejkaMF52:
             if cEt > 1:
                 cEt = 1
 
-            # Calculate equivalent cSAt with longitudinal slip
-            # TODO: implement longitudinal dynamics first
+            # Calculate the equivalent slip angle for pneumatic trail under combined slip
+            # TODO: protect cKy against divide by zero
+            cSAteq = math.sqrt(cSAt ** 2 + (param_x['cKx'] / param_y['cKy']) ** 2 * kappa ** 2) * math.copysign(1, cSAt)
 
-            t = cDt * math.cos(cCt * math.atan(cBt * cSAt - cEt * (cBt * cSAt - math.atan(cBt * cSAt)))) * math.cos(alpha)
+            # Calculate the pneumatic trail Mz factor
+            t = cDt * math.cos(cCt * math.atan(cBt * cSAteq - cEt * (cBt * cSAteq - math.atan(cBt * cSAt)))) * math.cos(alpha)
 
-            # Residual moment
-            # This is highly inefficient since we are going through the same calculation multiple times
-            param_y = self.params_fy(fz, alpha, gamma, kappa)
 
+            # Calculate the tire Mz contribution from the residual moment 
+            # Residual moment shift factors and slip angle
             cSHf = param_y['cSHy'] + param_y['cSVy'] / param_y['cKy']
             cSAr = alpha + cSHf
 
+            # Residual moment shape factors
             cBr = self.qBz9/self.uy + self.qBz10 * param_y['cBy'] * param_y['cCy']
             cDr = fz * ((self.qDz6 + self.qDz7 * self.fnorm(fz)) + (self.qDz8 + self.qDz9 * self.fnorm(fz)) * gamma) * self.r0 * math.cos(alpha) * self.uy
 
-            cMzr = cDr * math.cos(math.atan(cBr * cSAr))
+            # Calculate the equivalent slip angle for residual moment under combined slip
+            # TODO: protect cKy against divide by zero
+            cSAreq = math.sqrt(cSAr ** 2 + (param_x['cKx'] / param_y['cKy']) ** 2 * kappa ** 2) * math.copysign(1, cSAr)
 
-            # Longitudinal factor
+            # Calculate residual moment
+            cMzr = cDr * math.cos(math.atan(cBr * cSAreq))
+
+
+            # Calculate Fx factor
             s = self.r0 * (self.sSz1 * self.sSz2 * (fy / self.fnomin) + (self.sSz3 + self.sSz4 * self.fnorm(fz) * math.sin(gamma)))
 
-            # Pure side slip for now
-            mz = -t * fy + cMzr
+
+            # Total tire Mz
+            mz = -t * fy_prime + cMzr
 
         else:
             mz = 0
