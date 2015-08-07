@@ -369,7 +369,7 @@ class PacejkaMF52:
 
 
             # Total tire Mz
-            mz = -t * fy_prime + cMzr
+            mz = -t * fy_prime + cMzr + s * fx
 
         else:
             mz = 0
