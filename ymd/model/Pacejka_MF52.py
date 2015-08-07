@@ -325,17 +325,17 @@ class PacejkaMF52:
             fy_prime = self.calc_fy_prime(fz, alpha, gamma, kappa)
 
             # Pneumatic trail shift factors and slip angle
-            cSHt = self.qHz1 + self.qHz2 * self.fnorm(fz) + (self.qHz3 + self.qHz4 * self.fnorm(fz)) * gamma
+            cSHt = self.qHz1 + self.qHz2 * self.fnorm(fz) + (self.qHz3 + self.qHz4 * self.fnorm(fz)) * math.sin(gamma)
             cSAt = math.tan(alpha) + cSHt
 
             # Pneumatic trail shape factors
-            cDt = fz * (self.qDz1 + self.qDz2 * self.fnorm(fz)) * (1 + self.qDz3 * gamma + self.qDz4 * gamma * gamma) * (self.r0 / self.fnomin)
+            cDt = fz * (self.qDz1 + self.qDz2 * self.fnorm(fz)) * (1 + self.qDz3 * math.sin(gamma) + self.qDz4 * math.sin(gamma) ** 2) * (self.r0 / self.fnomin)
             cCt = self.qCz1
-            cBt = (self.qBz1 + self.qBz2 * self.fnorm(fz) + self.qBz3 * self.fnorm(fz) ** 2) * (1 + self.qBz4 * gamma + self.qBz5 * math.fabs(gamma)) / self.uy
+            cBt = (self.qBz1 + self.qBz2 * self.fnorm(fz) + self.qBz3 * self.fnorm(fz) ** 2) * (1 + self.qBz4 * math.sin(gamma) + self.qBz5 * math.fabs(math.sin(gamma))) / self.uy
             if cBt < 0:
                 cBt = 0
 
-            cEt = (self.qEz1 + self.qEz2 * self.fnorm(fz) + self.qEz3 * self.fnorm(fz) ** 2) * (1 + (self.qEz4 + self.qEz5 * gamma) * math.atan(cBt * cCt * cSAt))
+            cEt = (self.qEz1 + self.qEz2 * self.fnorm(fz) + self.qEz3 * self.fnorm(fz) ** 2) * (1 + (self.qEz4 + self.qEz5 * math.sin(gamma)) * math.atan(cBt * cCt * cSAt))
             if cEt > 1:
                 cEt = 1
 
