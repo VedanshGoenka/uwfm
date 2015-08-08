@@ -3,6 +3,8 @@ import numpy as np
 
 from scipy.optimize import fsolve
 
+AIR_DENSITY = 1.2754  # kg/m^3
+
 
 class Quartet:
     '''An arbitrary class that holds the four corner values of a car.'''
@@ -39,7 +41,7 @@ class Quartet:
 
 
 class Vehicle:
-    def __init__(self, tires, mass, geometry, suspension):
+    def __init__(self, tires, mass, geometry, suspension, aero, setup):
         # Tires
         self.tires = tires  # TODO: protect this data member
 
@@ -65,6 +67,19 @@ class Vehicle:
         self.cornerspring_rear = suspension['cornerspring_rear']
         self.antirollstiffness_front = suspension['antirollstiffness_front']
         self.antirollstiffness_rear = suspension['antirollstiffness_rear']
+
+        # Aerodynamic
+        self.frontal_area = aero['frontal_area']
+        self.coeff_lift = aero['coeff_lift']
+        self.coeff_drag = aero['coeff_drag']  # unused for now
+        self.aero_balance = aero['aero_balance']
+
+        # Static Setup
+        # TODO: individual setup for each wheel.
+        self.static_camber_front = setup['static_camber_front']
+        self.static_camber_rear = setup['static_camber_rear']
+        self.static_toe_front = setup['static_toe_front']
+        self.static_toe_rear = setup['static_toe_rear']
 
     '''Mass'''
     @property
@@ -205,6 +220,72 @@ class Vehicle:
     def antirollstiffness_rear(self, antirollstiffness_rear):
         self.__antirollstiffness_rear = antirollstiffness_rear
 
+    '''Aerodynamics'''
+    @property
+    def frontal_area(self):
+        return self.__frontal_area
+
+    @frontal_area.setter
+    def frontal_area(self, frontal_area):
+        self.__frontal_area = frontal_area
+
+    @property
+    def coeff_lift(self):
+        return self.__coeff_lift
+
+    @coeff_lift.setter
+    def coeff_lift(self, coeff_lift):
+        self.__coeff_lift = coeff_lift
+
+    @property
+    def coeff_drag(self):
+        return self.__coeff_drag
+
+    @coeff_drag.setter
+    def coeff_drag(self, coeff_drag):
+        self.__coeff_drag = coeff_drag
+
+    @property
+    def aero_balance(self):
+        return self.__aero_balance
+
+    @aero_balance.setter
+    def aero_balance(self, aero_balance):
+        self.__aero_balance = aero_balance
+
+    '''Static Setup'''
+    @property
+    def static_camber_front(self):
+        return self.__static_camber_front
+
+    @static_camber_front.setter
+    def static_camber_front(self, static_camber_front):
+        self.__static_camber_front = math.radians(static_camber_front)
+
+    @property
+    def static_camber_rear(self):
+        return self.__static_camber_rear
+
+    @static_camber_rear.setter
+    def static_camber_rear(self, static_camber_rear):
+        self.__static_camber_rear = math.radians(static_camber_rear)
+
+    @property
+    def static_toe_front(self):
+        return self.__static_toe_front
+
+    @static_toe_front.setter
+    def static_toe_front(self, static_toe_front):
+        self.__static_toe_front = math.radians(static_toe_front)
+
+    @property
+    def static_toe_rear(self):
+        return self.__static_toe_rear
+
+    @static_toe_rear.setter
+    def static_toe_rear(self, static_toe_rear):
+        self.__static_toe_rear = math.radians(static_toe_rear)
+
     ''' Derived properties of the vehicle '''
     @property
     def a(self):
@@ -226,6 +307,17 @@ class Vehicle:
         stiffness_rear = self.cornerspring_rear + self.antirollstiffness_rear
         return stiffness_front / (stiffness_front + stiffness_rear)
 
+    def calc_aero_downforce(self, velocity):
+        '''Calculates the aerodynamic downforce acting on each wheel'''
+        downforce = 0.5 * AIR_DENSITY * self.frontal_area * self.coeff_lift * velocity ** 2
+        
+        downforce_fr = downforce * self.aero_balance / 2
+        downforce_fl = downforce_fr
+        downforce_rr = downforce * (1 - self.aero_balance) / 2
+        downforce_rl = downforce_rr
+
+        return Quartet(downforce_fr, downforce_fl, downforce_rr, downforce_rl)
+
     def calc_lat_load_transfer(self, a_lat):
         '''
         Calculate the lateral load transfer using the OptimumG Seminar method.
@@ -238,12 +330,12 @@ class Vehicle:
         # Weight transfer at the front axle
         nonsuspended_front = self.nonsuspended_mass / 2 * a_lat * self.tires.fr.re / self.trackwidth_front
         geometric_front = self.weightdist_front * self.suspended_mass * a_lat * self.rollcentre_front / self.trackwidth_front
-        elastic_front = self.antiroll_distribution * self.suspended_mass * a_lat * (self.rollcentre_front - self.cg_height) / self.trackwidth_front
+        elastic_front = self.antiroll_distribution * self.suspended_mass * a_lat * (self.cg_height - self.rollcentre_front) / self.trackwidth_front
 
         # Weight transfer at the rear axle
         nonsuspended_rear = self.nonsuspended_mass / 2 * a_lat * self.tires.rr.re / self.trackwidth_rear
         geometric_rear = (1 - self.weightdist_front) * self.suspended_mass * a_lat * self.rollcentre_rear / self.trackwidth_rear
-        elastic_rear = (1 - self.antiroll_distribution) * self.suspended_mass * a_lat * (self.rollcentre_rear - self.cg_height) / self.trackwidth_rear
+        elastic_rear = (1 - self.antiroll_distribution) * self.suspended_mass * a_lat * (self.cg_height - self.rollcentre_rear) / self.trackwidth_rear
 
         # Package the components nicely in a dictionary
         loadtransfer = {'nonsuspended_front': nonsuspended_front,
@@ -257,18 +349,19 @@ class Vehicle:
         # Return all components of the weight transfer. Think of a better name for this.
         return loadtransfer
 
-    def calc_vertical_load(self, a_lat, a_long, mode=None):
+    def calc_vertical_load(self, a_lat, a_long, velocity):
         '''Calculate the tire vertical load'''
 
         loadtransfer = self.calc_lat_load_transfer(a_lat)
+        downforce = self.calc_aero_downforce(velocity)
 
         # Sum the components of the weight transfer
         front_lat_trnsfr = loadtransfer['nonsuspended_front'] + loadtransfer['geometric_front'] + loadtransfer['elastic_front']
         rear_lat_trnsfr = loadtransfer['nonsuspended_rear'] + loadtransfer['geometric_rear'] + loadtransfer['elastic_rear']
 
-        # Wheel vertical load without weight transfer effects for a single whel
-        fz_front_wheel = -(9.81 * self.mass * self.weightdist_front / 2)
-        fz_rear_wheel = -(9.81 * self.mass * (1 - self.weightdist_front) / 2)
+        # Wheel vertical load without weight transfer effects for a single wheel
+        fz_front_wheel = -(9.81 * self.mass * self.weightdist_front / 2) - downforce.fr - downforce.fl
+        fz_rear_wheel = -(9.81 * self.mass * (1 - self.weightdist_front) / 2) - downforce.rr - downforce.rl
 
         # Wheel lift assumption - for a given axle, wheel will take entire axle load
         if math.fabs(front_lat_trnsfr) > math.fabs(fz_front_wheel):
@@ -318,10 +411,10 @@ class Vehicle:
         displacement_rear = self.trackwidth_rear / 2 * math.tan(roll_angle)
 
         # Inclination angle in the 'vehicle' frame of reference
-        gamma_fr = -roll_angle + math.atan(displacement_front / self.vsal_front)
-        gamma_fl = roll_angle - math.atan(displacement_front / self.vsal_front)
-        gamma_rr = -roll_angle + math.atan(displacement_rear / self.vsal_rear)
-        gamma_rl = roll_angle - math.atan(displacement_rear / self.vsal_rear)
+        gamma_fr = -roll_angle + math.atan(displacement_front / self.vsal_front) + self.static_camber_front
+        gamma_fl = roll_angle - math.atan(displacement_front / self.vsal_front) + self.static_camber_front
+        gamma_rr = -roll_angle + math.atan(displacement_rear / self.vsal_rear) + self.static_camber_rear
+        gamma_rl = roll_angle - math.atan(displacement_rear / self.vsal_rear) + self.static_camber_rear
 
         return Quartet(gamma_fr, gamma_fl, gamma_rr, gamma_rl)
 
@@ -330,17 +423,17 @@ class Vehicle:
 
         velocity_y = velocity*math.tan(beta)
 
-        alpha_fr = math.atan((velocity_y + self.a*yaw_speed)/(velocity - self.trackwidth/2 * yaw_speed))
-        alpha_fl = math.atan((velocity_y + self.a*yaw_speed)/(velocity + self.trackwidth/2 * yaw_speed))
-        alpha_rr = math.atan((velocity_y - self.b*yaw_speed)/(velocity - self.trackwidth/2 * yaw_speed))
-        alpha_rl = math.atan((velocity_y - self.b*yaw_speed)/(velocity + self.trackwidth/2 * yaw_speed))
+        alpha_fr = math.atan((velocity_y + self.a*yaw_speed)/(velocity - self.trackwidth/2 * yaw_speed)) + self.static_toe_front
+        alpha_fl = math.atan((velocity_y + self.a*yaw_speed)/(velocity + self.trackwidth/2 * yaw_speed)) - self.static_toe_front
+        alpha_rr = math.atan((velocity_y - self.b*yaw_speed)/(velocity - self.trackwidth/2 * yaw_speed)) + self.static_toe_rear
+        alpha_rl = math.atan((velocity_y - self.b*yaw_speed)/(velocity + self.trackwidth/2 * yaw_speed)) - self.static_toe_rear
 
         return Quartet(alpha_fr, alpha_fl, alpha_rr, alpha_rl)
 
     def calc_lateral_forces(self, fz, alpha, delta, gamma):
         '''Calculate the lateral force generated by the tires'''
 
-        # Ignore camber effects for now
+        # Slip angle sign flip-flop is done here
         fy_fr = self.tires.fr.calc_fy(fz.fr, alpha.fr+delta, 0, -gamma.fr)
         fy_fl = -self.tires.fl.calc_fy(fz.fl, -(alpha.fl+delta), 0, -gamma.fl)
         fy_rr = self.tires.rr.calc_fy(fz.rr, alpha.rr, 0, -gamma.rr)
@@ -364,7 +457,7 @@ class Vehicle:
         alpha = self.calc_slip_angles(velocity, yaw_speed, beta)
         gamma = self.calc_camber_angles(a_lat)
 
-        fz = self.calc_vertical_load(a_lat, 0)  # assume a_long is zero
+        fz = self.calc_vertical_load(a_lat, 0, velocity)  # assume a_long is zero
         fy = self.calc_lateral_forces(fz, alpha, delta, gamma)
         mz = self.calc_self_aligning(fz, alpha, delta, gamma)
 

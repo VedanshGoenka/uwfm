@@ -39,11 +39,13 @@ def build_vehicle_model(vehicle_config, tire_config):
     mass = {key: float(config['mass'][key]) for key in config['mass']}
     geometry = {key: float(config['geometry'][key]) for key in config['geometry']}
     suspension = {key: float(config['suspension'][key]) for key in config['suspension']}
+    aero = {key: float(config['aerodynamic'][key]) for key in config['aerodynamic']}
+    setup = {key: float(config['setup'][key]) for key in config['setup']}
 
     tire_model = build_tire_model(tire_config)
     tires = Quartet(tire_model, tire_model, tire_model, tire_model)  # same tires on all four corners
 
-    return Vehicle(tires, mass, geometry, suspension)
+    return Vehicle(tires, mass, geometry, suspension, aero, setup)
 
 
 def build_simulation_params(simulation_config):
