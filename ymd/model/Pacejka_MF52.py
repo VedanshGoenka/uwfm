@@ -276,6 +276,7 @@ class PacejkaMF52:
 
         else:
             fy = 0
+            cSVyk = 0  # set this value when in the else condition
 
         # Return two items, the latter being used for the self-aligning torque calculation
         return fy, fy - cSVyk
@@ -308,21 +309,26 @@ class PacejkaMF52:
         return self.fy_wrapper(f_z, alpha, kappa, gamma)[1]
 
     def calc_mz(self, fz, alpha, kappa, gamma):
+        '''
+        Calculates self-aligning torque, M_z
+        where f_z    vertical tire load [N]
+              alpha  slip angle [rad]
+              kappa  slip ratio
+              gamma  camber angle [rad]
+        '''
         if fz < 0:
-            # TODO: are we using alpha*, kappa* and gamma*?
-            # TODO: re-organize this huge mess of a function
-
             # Get pure longitudinal and lateral coefficients
-            param_x = self.params_fx(fz, alpha, gamma, kappa)
-            param_y = self.params_fy(fz, alpha, gamma, kappa)
+            param_x = self.params_fx(fz, alpha, kappa, gamma)
+            param_y = self.params_fy(fz, alpha, kappa, gamma)
 
             # Calculate base tire forces
-            fx = self.calc_fx(fz, alpha, gamma, kappa)
-            fy = self.calc_fx(fz, alpha, gamma, kappa)
+            fx = self.calc_fx(fz, alpha, kappa, gamma)
+            fy = self.calc_fy(fz, alpha, kappa, gamma)
 
             # Calculate the tire Mz contribution from the pneumatic trail
             # Find Fy'
-            fy_prime = self.calc_fy_prime(fz, alpha, gamma, kappa)
+            fy_prime = self.calc_fy_prime(fz, alpha, kappa, gamma)
+
 
             # Pneumatic trail shift factors and slip angle
             cSHt = self.qHz1 + self.qHz2 * self.fnorm(fz) + (self.qHz3 + self.qHz4 * self.fnorm(fz)) * math.sin(gamma)
