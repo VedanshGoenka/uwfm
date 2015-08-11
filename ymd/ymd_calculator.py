@@ -1,7 +1,6 @@
 import argparse
 import configparser
 import math
-import matplotlib.pyplot as plt
 import numpy as np
 
 from model.Pacejka_MF52 import PacejkaMF52 as Pacejka
@@ -59,71 +58,8 @@ def build_simulation_params(simulation_config):
     return YMDSimulation(simulation_params)
 
 
-def converge_lateral_acceleration(car, simulation, beta, delta):
-    '''Iterates vehicle model until the lateral acceleration converges'''
-
-    # Initialize variables
-    a_lat = 0
-    a_lat_prev = 100
-
-    # Iterate until we are within the allowed tolerance
-    while math.fabs(a_lat - a_lat_prev) > simulation.tolerance:
-        # Relaxation to allow convergence at low speeds
-        a_lat = a_lat * simulation.relaxation + a_lat_prev * (1 - simulation.relaxation)
-        a_lat_prev = a_lat
-
-        # Calculate vehicle yaw speed
-        yaw_speed = a_lat/simulation.velocity
-
-        solution = car.calc_vehicle_forces(simulation.velocity, yaw_speed, a_lat, beta, delta)
-
-        a_lat = solution.flat[1]/car.mass
-
-    return solution
-
-
-def plot_ymd_results(result_ay, result_mz, simulation):
-    plt.plot(np.transpose(result_ay)[:][:],
-             np.transpose(result_mz)[:][:], color='black')
-    plt.plot(result_ay[:][:], result_mz[:][:], color='red')
-
-    plt.xlabel('Lateral Acceleration [g]')
-    plt.ylabel('Yaw Moment [Nm]')
-    plt.title('Yaw Moment Diagram - {:.1f} [m/s]'.format(simulation.velocity))
-    plt.grid(True)
-
-    plt.show()
-
-
-def ymd_calculator(car, simulation):
-    '''Generates a Yaw Moment Diagram using the given parameters in the config files'''
-
-    # Initialize results arraw
-    result_ay = np.empty([len(simulation.beta_range), len(simulation.delta_range)])
-    result_mz = np.empty([len(simulation.beta_range), len(simulation.delta_range)])
-
-    # Sweep through all the combinations of beta and delta and solve
-    for i, beta in enumerate(simulation.beta_range):
-        for j, delta in enumerate(simulation.delta_range):
-            solution = converge_lateral_acceleration(car, simulation, beta, delta)
-
-            result_ay[i][j] = solution.flat[1]/car.mass / 9.81
-            result_mz[i][j] = solution.flat[2]
-
-    return result_ay, result_mz
-
-
-def ymd_calculator_wrapper(simulation_config, vehicle_config, tire_config):
-    '''Wrapper function that builds the models for us before calling ymd_calculator'''
-    simulation = build_simulation_params(simulation_config)
-    car = build_vehicle_model(vehicle_config, tire_config)
-
-    result_ay, result_mz = ymd_calculator(car, simulation)
-
-    return result_ay, result_mz, car, simulation
-
-
 def main():
+    # Parse input arguments
     parser = argparse.ArgumentParser(description='Generates a Yaw Moment Diagram')
     parser.add_argument('-v', '--vehicle-config', type=str, required=True)
     parser.add_argument('-t', '--tire-config', type=str, required=True)
@@ -131,9 +67,17 @@ def main():
     parser.add_argument('-o', '--output', type=str, required=False)
     args = parser.parse_args()
 
-    results_ay, results_mz, vehicle_model, ymd_simulation = ymd_calculator_wrapper(args.simulation_config, args.vehicle_config, args.tire_config)
+    # Get the vehicle 
+    car = build_vehicle_model(args.vehicle_config, args.tire_config)
 
-    plot_ymd_results(results_ay, results_mz, ymd_simulation)
+    # Build the simulation instance
+    simulation = build_simulation_params(args.simulation_config)
+
+    # Run the simulation
+    simulation.generate_ymd(car)
+
+    # Plot the results
+    simulation.plot_results()
 
 
 if __name__ == "__main__":
