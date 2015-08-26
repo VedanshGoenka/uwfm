@@ -395,7 +395,7 @@ class Vehicle:
 
         # Calculate the total roll moment to be reacted
         roll_moment = loadtransfer['elastic_front'] * self.trackwidth_front + loadtransfer['elastic_rear'] * self.trackwidth_rear
-        roll_equation = lambda theta: self.calc_roll_moment(theta) - roll_moment
+        roll_equation = lambda theta: self.calc_roll_moment(theta) + roll_moment
         roll_angle = fsolve(roll_equation, 0)
 
         return roll_angle.flat[0]
@@ -411,10 +411,10 @@ class Vehicle:
         displacement_rear = self.trackwidth_rear / 2 * math.tan(roll_angle)
 
         # Inclination angle in the 'vehicle' frame of reference
-        gamma_fr = -roll_angle + math.atan(displacement_front / self.vsal_front) + self.static_camber_front
-        gamma_fl = roll_angle - math.atan(displacement_front / self.vsal_front) + self.static_camber_front
-        gamma_rr = -roll_angle + math.atan(displacement_rear / self.vsal_rear) + self.static_camber_rear
-        gamma_rl = roll_angle - math.atan(displacement_rear / self.vsal_rear) + self.static_camber_rear
+        gamma_fr = roll_angle - math.atan(displacement_front / self.vsal_front) + self.static_camber_front
+        gamma_fl = -roll_angle + math.atan(displacement_front / self.vsal_front) + self.static_camber_front
+        gamma_rr = roll_angle - math.atan(displacement_rear / self.vsal_rear) + self.static_camber_rear
+        gamma_rl = -roll_angle + math.atan(displacement_rear / self.vsal_rear) + self.static_camber_rear
 
         return Quartet(gamma_fr, gamma_fl, gamma_rr, gamma_rl)
 

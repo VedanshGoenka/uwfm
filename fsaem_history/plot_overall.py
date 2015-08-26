@@ -66,7 +66,8 @@ except:
     all_points = competition_results_data.Points.convert_objects(convert_numeric=True)
 
 all_points = all_points[~np.isnan(all_points)]
-plt.hist(all_points.values, bins = 50);
+bins = np.linspace(0, 1000, 51)
+plt.hist(all_points.values, bins = bins);
 plt.xlim([0, 1000])
 
 # Plot a single year
@@ -85,13 +86,13 @@ year = 2014
 
 # In case we have a string, prepare a dictionary to convert points to numeric
 mapping = {'withdrawn': 0, 'forfeit': 0}
-bins = np.linspace(0, 1000, 20)
 
 try:
     year_points = competition_results_data[competition_results_data.Year == year].Points.replace(mapping).convert_objects(convert_numeric=True)
 except:
     year_points = competition_results_data[competition_results_data.Year == year].Points.convert_objects(convert_numeric=True)
 
-plt.hist(year_points.values, bins=bins, color='#990000');
+bins = np.linspace(0, 1000, 26)
+plt.hist(year_points.values, bins = bins, color='#990000');
 plt.xlim([0, 1000])
 plt.show()
