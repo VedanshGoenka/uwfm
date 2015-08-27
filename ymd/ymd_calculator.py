@@ -84,7 +84,7 @@ def main():
 
     # Plot the results
     analysis.plot_results()
-
+    analysis.plot_nondim_results()
 
 if __name__ == "__main__":
     main()

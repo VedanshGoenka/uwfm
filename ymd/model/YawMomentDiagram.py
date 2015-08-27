@@ -209,20 +209,20 @@ class YMDSimulation:
 
     @property
     def nondim_result_ay(self):
-        return self._result_ay / (self.car.mass * GRAVITY_ACCEL)
+        return self._result_ay / (self.vehicle.mass * GRAVITY_ACCEL)
 
     @property
     def nondim_result_ax(self):
-        return self._result_ax / (self.car.mass * GRAVITY_ACCEL)
+        return self._result_ax / (self.vehicle.mass * GRAVITY_ACCEL)
 
     @property
     def nondim_result_mz(self):
-        return self._result_mz / (self.car.mass * GRAVITY_ACCEL * self.car.wheelbase)
+        return self._result_mz / (self.vehicle.mass * GRAVITY_ACCEL * self.vehicle.wheelbase)
 
     def start_simulation(self):
         ''' Run the simulation with the help of the YMDSolver object '''
         solver = YMDSolver(self.vehicle, self.parameters)
-        self._result_ay, self._result_ax, self._result_mz = solver.generate_ymd()
+        self._result_ax, self._result_ay, self._result_mz = solver.generate_ymd()
 
         # Raise a flag once the simulation has started
         self._is_simulated = True
@@ -253,8 +253,8 @@ class YMDAnalysis:
                  np.transpose(self.simulation.result_mz)[:][:], color='black')
         plt.plot(self.simulation.result_ay[:][:], self.simulation.result_mz[:][:], color='red')
 
-        plt.xlabel('Lateral Acceleration [m/s]')
-        plt.ylabel('Yaw Moment [Nm]')
+        plt.xlabel('Ay - Lateral Acceleration [m/s]')
+        plt.ylabel('Mz - Yaw Moment [Nm]')
         plt.title('Yaw Moment Diagram - {:.1f} [m/s]'.format(self.simulation.parameters.velocity))
         plt.grid(True)
 
@@ -273,8 +273,8 @@ class YMDAnalysis:
         plt.plot(self.simulation.nondim_result_ay[:][:],
                  self.simulation.nondim_result_mz[:][:], color='red')
 
-        plt.xlabel('Lateral Acceleration [m/s]')
-        plt.ylabel('Yaw Moment [Nm]')
+        plt.xlabel('Ay - Lateral Acceleration [g]')
+        plt.ylabel('Cn - Non-Dimensionalized Yaw Moment')
         plt.title('Yaw Moment Diagram - {:.1f} [m/s]'.format(self.simulation.parameters.velocity))
         plt.grid(True)
 
