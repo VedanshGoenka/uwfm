@@ -6,7 +6,7 @@ import numpy as np
 from model.Pacejka_MF52 import PacejkaMF52 as Pacejka
 from model.Vehicle import Quartet
 from model.Vehicle import Vehicle
-from model.YMDSimulation import YMDSimulation
+from model.YawMomentDiagram import YMDParameters, YMDSimulation, YMDAnalysis
 
 
 def build_tire_model(filename):
@@ -55,7 +55,7 @@ def build_simulation_params(simulation_config):
 
     simulation_params = {key: float(config['simulation'][key]) for key in config['simulation']}
 
-    return YMDSimulation(simulation_params)
+    return YMDParameters(simulation_params)
 
 
 def main():
@@ -70,14 +70,20 @@ def main():
     # Get the vehicle 
     car = build_vehicle_model(args.vehicle_config, args.tire_config)
 
+    # Build the simulation parameter instance
+    parameters = build_simulation_params(args.simulation_config)
+
     # Build the simulation instance
-    simulation = build_simulation_params(args.simulation_config)
+    simulation = YMDSimulation(car, parameters)
 
     # Run the simulation
-    simulation.generate_ymd(car)
+    simulation.start_simulation()
+
+    # Build a YMDAnalysis instance
+    analysis = YMDAnalysis(simulation)
 
     # Plot the results
-    simulation.plot_results()
+    analysis.plot_results()
 
 
 if __name__ == "__main__":
