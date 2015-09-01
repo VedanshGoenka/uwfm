@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 
+from scipy.interpolate import interp1d
+from scipy.optimize import fsolve
+
 GRAVITY_ACCEL = 9.81  # [m/s]
 
 
@@ -195,12 +198,12 @@ class YMDSimulation:
     @property
     def result_ay(self):
         # Will not exist if start_simulation() is not ran.
-        return self._result_ay
+        return self._result_ay / (self.vehicle.mass)
 
     @property
     def result_ax(self):
         # Will not exist if start_simulation() is not ran.
-        return self._result_ax
+        return self._result_ax / (self.vehicle.mass)
 
     @property
     def result_mz(self):
@@ -247,13 +250,80 @@ class YMDAnalysis:
             self.__simulationt = None
             warnings.warn('YMDSimulation contains no results', UserWarning)
 
+    @property
+    def max_lateral_accel(self):
+        '''Finds the maximum lateral acceleration in the yaw moment diagram in [g]'''
+        i, j = self._max_lateral_accel_idx()
+
+        return self.simulation.result_ay[i][j] / GRAVITY_ACCEL
+
+    @property
+    def residual_yaw_moment(self):
+        '''Finds the residual yaw moment at maximum lateral acceleration in [Nm]'''
+        i, j = self._max_lateral_accel_idx()
+
+        return self.simulation.result_mz[i][j]
+
+    @property
+    def trim_lateral_accel(self):
+        '''Finds the maximum trim lateral acceleration in [g]'''
+
+        max_trim_latacc = 0
+
+        # For each vehicle slip isoline
+        for i, beta in enumerate(self.simulation.parameters.beta_range):
+            # Dectect when the lateral acceleration is no longer decreasing
+            deriv_isoline = np.gradient(self.simulation.result_ay[i,:])
+            range_of_isoline = np.nonzero(deriv_isoline < 0) 
+
+            # Interpolate within the range of interest
+            try:
+                interped = interp1d(self.simulation.result_mz[i, range_of_isoline].squeeze(),
+                                    self.simulation.result_ay[i, range_of_isoline].squeeze(),
+                                    kind='linear')
+
+                # If there is an error, ignore the result
+                trim_latacc = interped(0)
+            except ValueError:
+                trim_latacc = 0
+
+            # Check if we have a new candidate for trim latacc
+            if trim_latacc > max_trim_latacc:
+                max_trim_latacc = trim_latacc
+
+        # Now for each steer isoline
+        for j, delta in enumerate(self.simulation.parameters.delta_range):
+            deriv_isoline = np.gradient(self.simulation.result_ay[:,j])
+            range_of_isoline = np.nonzero(deriv_isoline < 0) 
+
+            try:
+                interped = interp1d(self.simulation.result_mz[range_of_isoline, j].squeeze(),
+                                    self.simulation.result_ay[range_of_isoline, j].squeeze(),
+                                    kind='linear')
+
+                trim_latacc = interped(0)
+            except ValueError:
+                trim_latacc = 0
+
+            if trim_latacc > max_trim_latacc:
+                max_trim_latacc = trim_latacc
+
+        return max_trim_latacc / GRAVITY_ACCEL
+
+    def _max_lateral_accel_idx(self):
+        i, j = np.unravel_index(self.simulation.result_ay.argmax(),
+                                self.simulation.result_ay.shape)
+        
+        return i, j
+
     def plot_results(self):
         '''Plots the raw results of the simulation. Warning: no protection if variables are empty!'''
-        plt.plot(np.transpose(self.simulation.result_ay)[:][:],
+        plt.figure()
+        plt.plot(np.transpose(self.simulation.nondim_result_ay)[:][:],
                  np.transpose(self.simulation.result_mz)[:][:], color='black')
-        plt.plot(self.simulation.result_ay[:][:], self.simulation.result_mz[:][:], color='red')
+        plt.plot(self.simulation.nondim_result_ay[:][:], self.simulation.result_mz[:][:], color='red')
 
-        plt.xlabel('Ay - Lateral Acceleration [m/s]')
+        plt.xlabel('Ay - Lateral Acceleration [g]')
         plt.ylabel('Mz - Yaw Moment [Nm]')
         plt.title('Yaw Moment Diagram - {:.1f} [m/s]'.format(self.simulation.parameters.velocity))
         plt.grid(True)
@@ -264,10 +334,9 @@ class YMDAnalysis:
         # Define the legend and the legend font size
         plt.legend(handles=[const_steer, const_slip], prop={'size': 12})
 
-        plt.show()
-
     def plot_nondim_results(self):
         '''Plots the nondimensionalized results of the simulation. Warning: no protection if variables are empty!'''
+        plt.figure()
         plt.plot(np.transpose(self.simulation.nondim_result_ay)[:][:],
                  np.transpose(self.simulation.nondim_result_mz)[:][:], color='black')
         plt.plot(self.simulation.nondim_result_ay[:][:],
@@ -284,4 +353,5 @@ class YMDAnalysis:
         # Define the legend and the legend font size
         plt.legend(handles=[const_steer, const_slip], prop={'size': 12})
 
+    def show_plots(self):
         plt.show()

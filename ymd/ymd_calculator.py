@@ -1,6 +1,8 @@
 import argparse
 import configparser
 import math
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 
 from model.Pacejka_MF52 import PacejkaMF52 as Pacejka
@@ -82,9 +84,15 @@ def main():
     # Build a YMDAnalysis instance
     analysis = YMDAnalysis(simulation)
 
+    # Output metrics
+    print(analysis.max_lateral_accel)
+    print(analysis.residual_yaw_moment)
+    print(analysis.trim_lateral_accel)
+
     # Plot the results
     analysis.plot_results()
     analysis.plot_nondim_results()
+    analysis.show_plots()
 
 if __name__ == "__main__":
     main()
