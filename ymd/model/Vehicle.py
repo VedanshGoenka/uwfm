@@ -54,7 +54,6 @@ class Vehicle:
 
         # Geometry
         self.wheelbase = geometry['wheelbase']  # wheelbase [m]
-        self.trackwidth = geometry['trackwidth']  # track wdith [m]
         self.trackwidth_front = geometry['trackwidth_front']
         self.trackwidth_rear = geometry['trackwidth_rear']
         self.rollcentre_front = geometry['rollcentre_front']
@@ -130,14 +129,6 @@ class Vehicle:
     @wheelbase.setter
     def wheelbase(self, wheelbase):
         self.__wheelbase = wheelbase
-
-    @property
-    def trackwidth(self):
-        return self.__trackwidth
-
-    @trackwidth.setter
-    def trackwidth(self, trackwidth):
-        self.__trackwidth = trackwidth
 
     @property
     def trackwidth_front(self):
@@ -303,8 +294,12 @@ class Vehicle:
     def antiroll_distribution(self):
         '''Calculates the anti-roll stiffness calculation. This is also known as the first magic number'''
 
-        stiffness_front = self.cornerspring_front + self.antirollstiffness_front
-        stiffness_rear = self.cornerspring_rear + self.antirollstiffness_rear
+        # Calculate the anti-roll stiffness per degree from the springs
+        ar_spring_front = self.trackwidth_front**2 * self.cornerspring_front * math.tan(math.radians(1)) / 2
+        ar_spring_rear = self.trackwidth_rear**2 * self.cornerspring_rear * math.tan(math.radians(1)) / 2
+
+        stiffness_front = ar_spring_front + self.antirollstiffness_front
+        stiffness_rear = ar_spring_rear + self.antirollstiffness_rear
         return stiffness_front / (stiffness_front + stiffness_rear)
 
     def calc_aero_downforce(self, velocity):
@@ -380,11 +375,8 @@ class Vehicle:
     def calc_roll_moment(self, theta):
         '''Calculate the antiroll stiffness for a given roll angle in radians'''
 
-        wheelrate_front = self.cornerspring_front + self.antirollstiffness_front
-        wheelrate_rear = self.cornerspring_rear + self.antirollstiffness_rear
-
-        antiroll_front = self.trackwidth_front ** 2 * math.tan(theta) * wheelrate_front / 2
-        antiroll_rear = self.trackwidth_rear ** 2 * math.tan(theta) * wheelrate_rear / 2
+        antiroll_front = self.antirollstiffness_front * math.degrees(theta) + self.trackwidth_front**2 * self.cornerspring_front * math.tan(theta) / 2
+        antiroll_rear = self.antirollstiffness_rear * math.degrees(theta) + self.trackwidth_rear**2 * self.cornerspring_rear * math.tan(theta) / 2
 
         return antiroll_front + antiroll_rear
 
@@ -423,10 +415,10 @@ class Vehicle:
 
         velocity_y = velocity*math.tan(beta)
 
-        alpha_fr = math.atan((velocity_y + self.a*yaw_speed)/(velocity - self.trackwidth/2 * yaw_speed)) + self.static_toe_front
-        alpha_fl = math.atan((velocity_y + self.a*yaw_speed)/(velocity + self.trackwidth/2 * yaw_speed)) - self.static_toe_front
-        alpha_rr = math.atan((velocity_y - self.b*yaw_speed)/(velocity - self.trackwidth/2 * yaw_speed)) + self.static_toe_rear
-        alpha_rl = math.atan((velocity_y - self.b*yaw_speed)/(velocity + self.trackwidth/2 * yaw_speed)) - self.static_toe_rear
+        alpha_fr = math.atan((velocity_y + self.a*yaw_speed)/(velocity - self.trackwidth_front/2 * yaw_speed)) + self.static_toe_front
+        alpha_fl = math.atan((velocity_y + self.a*yaw_speed)/(velocity + self.trackwidth_front/2 * yaw_speed)) - self.static_toe_front
+        alpha_rr = math.atan((velocity_y - self.b*yaw_speed)/(velocity - self.trackwidth_rear/2 * yaw_speed)) + self.static_toe_rear
+        alpha_rl = math.atan((velocity_y - self.b*yaw_speed)/(velocity + self.trackwidth_rear/2 * yaw_speed)) - self.static_toe_rear
 
         return Quartet(alpha_fr, alpha_fl, alpha_rr, alpha_rl)
 
@@ -470,8 +462,8 @@ class Vehicle:
         a22 = math.cos(delta)
         a23 = 1
         a24 = 1
-        a31 = (self.trackwidth/2*math.sin(delta) + self.a*math.cos(delta))
-        a32 = (-self.trackwidth/2*math.sin(delta) + self.a*math.cos(delta))
+        a31 = (self.trackwidth_front/2*math.sin(delta) + self.a*math.cos(delta))
+        a32 = (-self.trackwidth_front/2*math.sin(delta) + self.a*math.cos(delta))
         a33 = -self.b
         a34 = -self.b
 
