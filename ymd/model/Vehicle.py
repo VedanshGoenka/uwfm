@@ -292,7 +292,7 @@ class Vehicle:
 
     @property
     def antiroll_distribution(self):
-        '''Calculates the anti-roll stiffness calculation. This is also known as the first magic number'''
+        '''Calculates the anti-roll stiffness distribution. This is also known as the first magic number'''
 
         # Calculate the anti-roll stiffness per degree from the springs
         ar_spring_front = self.trackwidth_front**2 * self.cornerspring_front * math.tan(math.radians(1)) / 2
@@ -300,6 +300,7 @@ class Vehicle:
 
         stiffness_front = ar_spring_front + self.antirollstiffness_front
         stiffness_rear = ar_spring_rear + self.antirollstiffness_rear
+
         return stiffness_front / (stiffness_front + stiffness_rear)
 
     def calc_aero_downforce(self, velocity):
