@@ -35,9 +35,11 @@ configuration folders: `simulation`, `tire`, `vehicle`.
 
 `data/simulation/generic_ymd.ini` is a sample configuration for the ymd
 simulation parameters.
+
 `data/tire/generic_tire.ini` is an empty configuration for the MF5.2 tire
 coefficients. You will need to populate a tire configuration file with your own
 tire coefficients.
+
 `data/vehicle/generic_fsae.ini` is a sample vehicle configuration. This
 file defines the vehicle mass, geometry, suspension and static setup.
 

@@ -88,6 +88,8 @@ def main():
     print(analysis.max_lateral_accel)
     print(analysis.residual_yaw_moment)
     print(analysis.trim_lateral_accel)
+    print(analysis.entry_control)
+    print(analysis.entry_stability)
 
     # Plot the results
     analysis.plot_results()

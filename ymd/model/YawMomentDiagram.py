@@ -316,6 +316,34 @@ class YMDAnalysis:
         
         return i, j
 
+    @property
+    def entry_control(self):
+        # Find the index where beta and delta are zero
+        beta_idx, delta_idx = self._zero_zero_idx() 
+
+        # Calculate the change in yaw moment
+        delta_mz = self.simulation.result_mz[beta_idx,delta_idx-1] - self.simulation.result_mz[beta_idx,delta_idx]
+
+        # Calculate the control 
+        return delta_mz / self.simulation.parameters.delta_increment
+
+    @property
+    def entry_stability(self):
+        # Find the index where beta and delta are zero
+        beta_idx, delta_idx = self._zero_zero_idx() 
+
+        # Calculate the change in yaw moment
+        delta_mz = self.simulation.result_mz[beta_idx-1,delta_idx] - self.simulation.result_mz[beta_idx,delta_idx]
+
+        # Calculate the control 
+        return delta_mz / self.simulation.parameters.beta_increment
+
+    def _zero_zero_idx(self):
+        beta_idx = self.simulation.parameters.beta_range.index(0)
+        delta_idx = self.simulation.parameters.delta_range.index(0)
+
+        return beta_idx, delta_idx
+
     def plot_results(self):
         '''Plots the raw results of the simulation. Warning: no protection if variables are empty!'''
         plt.figure()
