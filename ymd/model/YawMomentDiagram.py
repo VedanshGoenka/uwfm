@@ -7,8 +7,9 @@ import warnings
 from scipy.interpolate import interp1d
 from scipy.optimize import fsolve
 
-GRAVITY_ACCEL = 9.81  # [m/s]
+np.seterr(divide='raise')
 
+GRAVITY_ACCEL = 9.81  # [m/s]
 
 class YMDParameters:
     '''Class to represent YMD simulation parameters'''
@@ -128,7 +129,7 @@ class YMDSolver:
         a_lat_prev = 100
 
         # Iterate until we are within the allowed tolerance
-        while math.fabs(a_lat - a_lat_prev) > self.parameters.tolerance:
+        '''while math.fabs(a_lat - a_lat_prev) > self.parameters.tolerance:
             # Relaxation to allow convergence at low speeds
             a_lat = a_lat * self.parameters.relaxation + a_lat_prev * (1 - self.parameters.relaxation)
             a_lat_prev = a_lat
@@ -139,8 +140,53 @@ class YMDSolver:
             solution = car.calc_vehicle_forces(self.parameters.velocity, yaw_speed, a_lat, beta, delta)
 
             a_lat = solution.flat[1] / car.mass
+        '''
 
-        return solution
+        vehicle_accel = np.array([0, 0, 0])
+        vehicle_accel_prev = np.array([100, 100, 100])
+        first_iteration_flag = True
+
+        while math.fabs(np.linalg.norm(vehicle_accel) - np.linalg.norm(vehicle_accel_prev)) > self.parameters.tolerance:
+            # Apply a relaxation factor each interation to slow down
+            # simulation. This is for solver convergence.
+            if first_iteration_flag is False:
+                vehicle_accel = vehicle_accel * self.parameters.relaxation + vehicle_accel_prev * (1 - self.parameters.relaxation)
+            else:
+                first_iteration_flag = False
+            
+            # Keep track of the vehicle acceleration from the previous iteration
+            vehicle_accel_prev = vehicle_accel
+
+            # Define rotation matrix from body-fixed vehicle frame to
+            # normal-tangential coordinates
+            rotation_matrix = np.array([[math.cos(beta) , math.sin(beta), 0],
+                                        [-math.sin(beta), math.cos(beta), 0],
+                                        [              0,              0, 1]])
+
+            # Normal unit vector
+            unit_vector_normal = np.dot(rotation_matrix.transpose(), np.array([0, 1, 0]))
+
+            # Rotate vehicle accelerations to normal-tangential frame and find
+            # the magnitude of the rotation arm, rho
+            rotated_vehicle_accel = np.dot(rotation_matrix, vehicle_accel)
+            try:
+                rho = self.parameters.velocity**2 / rotated_vehicle_accel[1]
+            except FloatingPointError:
+                rho = 0
+
+            # Package the location of the yaw centre with respect to the
+            # vehicle centre-of-gravity.
+            yaw_centre = rho * unit_vector_normal
+
+            # Calculate the vehicle yaw speed
+            yaw_speed = rotated_vehicle_accel[1] / self.parameters.velocity
+
+            # Calculate the vehicle forces and normalize it by the vehicle mass.
+            # Ignore the yaw moment since we don't apply anything to it
+            vehicle_forces = car.calc_vehicle_forces(self.parameters.velocity, yaw_speed, yaw_centre, vehicle_accel[1], beta, delta)
+            vehicle_accel = vehicle_forces / car.mass
+
+        return vehicle_forces
 
     def generate_ymd(self):
         '''Generates a Yaw Moment Diagram using the given parameters in the config files'''
