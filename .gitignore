@@ -1,3 +1,5 @@
+ymd/.idea
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -55,3 +57,4 @@ target/
 
 #vim
 *.swp
+.DS_Store

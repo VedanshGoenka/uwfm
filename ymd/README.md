@@ -52,4 +52,8 @@ Example
 ```bash
 $ python ymd_calculator.py -v data/vehicle/generic_fsae.ini -t data/tire/generic_tire.ini -s data/simulation/generic_ymd.ini
 ```
+Vedansh Ran this:
+```bash
+$  python ymd_calculator.py -v data/vehicle/REV9.ini -t data/tire/MF612_Vedansh_FIT.ini -s data/simulation/per_ymd.ini 
+```
  
